@@ -1,3 +1,97 @@
 <resources>
     <string name="app_name">FFmpegAVTutorial</string>
+    <string name="home_title">FFmpeg-Tutorial</string>
+    <string name="feature_chevron">›</string>
+    <string name="back_arrow">←</string>
+
+    <string name="section_basic">一、音视频基础</string>
+    <string name="section_video_render">二、视频渲染</string>
+    <string name="section_audio_render">三、音频渲染</string>
+
+    <string name="feature_opengl_version_title">OpenGL Version</string>
+    <string name="feature_opengl_version_summary">FFmpeg 编译配置和版本信息；OpenGL 信息</string>
+    <string name="feature_custom_thread_title">Custom Thread</string>
+    <string name="feature_custom_thread_summary">封装线程能力，方便后续调度解码和渲染任务</string>
+    <string name="feature_movie_prober_title">Movie Prober</string>
+    <string name="feature_movie_prober_summary">查看音视频流、时长、码率和轨道信息</string>
+    <string name="feature_read_packet_title">Read Packet</string>
+    <string name="feature_read_packet_summary">读取音视频包，观察 demux 阶段输出</string>
+    <string name="feature_decode_packet_title">Decode Packet</string>
+    <string name="feature_decode_packet_summary">把压缩包送入解码器，得到原始帧数据</string>
+    <string name="feature_custom_decoder_title">Custom Decoder</string>
+    <string name="feature_custom_decoder_summary">抽取解码类，封装解码流程和状态管理</string>
+    <string name="feature_core_animation_title">Core Animation/Core Graphics/Core Media</string>
+    <string name="feature_core_animation_summary">渲染 xRGBx、NV12、YUYV、UYVY 等视频帧</string>
+    <string name="feature_legacy_opengl_title">Legacy OpenGL</string>
+    <string name="feature_legacy_opengl_summary">使用固定管线渲染 BGRA、NV12、YUV420P 等格式</string>
+    <string name="feature_modern_opengl_title">Modern OpenGL</string>
+    <string name="feature_modern_opengl_summary">使用着色器渲染 BGRA、NV12、YUV420P 等格式</string>
+    <string name="feature_modern_opengl_rect_title">Modern OpenGL(Rectangle Texture)</string>
+    <string name="feature_modern_opengl_rect_summary">基于矩形纹理渲染视频帧，减少坐标转换</string>
+    <string name="feature_metal_title">Metal</string>
+    <string name="feature_metal_summary">通过 Metal 管线渲染 BGRA、NV12、YUV420P 视频帧</string>
+    <string name="feature_audio_unit_title">AudioUnit</string>
+    <string name="feature_audio_unit_summary">支持 S16、S16P、Float、FloatP，覆盖 44.1K 到 192K 采样率</string>
+    <string name="feature_audio_queue_title">AudioQueue</string>
+    <string name="feature_audio_queue_summary">支持 S16、Float 格式，适合简单稳定的音频输出</string>
+
+    <string name="ffmpeg_info_title">FFmpeg Runtime Info</string>
+    <string name="ffmpeg_info_page_title">FFmpegInfo 信息展示</string>
+    <string name="ffmpeg_info_subtitle">展示当前集成 FFmpeg 的版本、配置、协议、封装格式与编解码器能力，适合学习和调试 API。</string>
+    <string name="open_ffmpeg_info_page">进入信息展示页</string>
+    <string name="refresh_ffmpeg_info">刷新信息</string>
+    <string name="loading_ffmpeg_info">正在读取 FFmpeg 运行时信息...</string>
+    <string name="ffmpeg_info_load_failed">读取 FFmpeg 信息失败：%1$s</string>
+
+    <string name="detail_overview_title">功能概览</string>
+    <string name="detail_focus_title">学习重点</string>
+    <string name="detail_practice_title">实现建议</string>
+
+    <string name="detail_custom_thread_overview">Custom Thread 页面聚焦于线程封装。它通常把解封装、解码、渲染或状态回调拆到独立工作线程里，避免阻塞主线程，同时让播放控制逻辑更清晰。</string>
+    <string name="detail_custom_thread_focus">学习这个模块时，重点要看线程生命周期、任务投递方式、退出时机以及和 JNI/渲染对象之间的同步关系。尤其要避免线程已经退出，但队列里还有旧任务继续访问已释放对象。</string>
+    <string name="detail_custom_thread_practice">实现时可以先封装一个最小线程类，提供 start、post、stop 接口，再逐步承载解码和渲染任务。等播放链路稳定后，再补条件变量、优先级和异常恢复策略。</string>
+
+    <string name="detail_movie_prober_overview">Movie Prober 对应媒体探测阶段。它负责打开输入源、读取容器信息、识别音视频轨道，并把时长、分辨率、码率、编码格式等元数据组织成可展示的数据结构。</string>
+    <string name="detail_movie_prober_focus">这个页面最值得关注的是 avformat_open_input、avformat_find_stream_info 以及 stream、codecpar、time_base 这些核心字段。理解它们后，后面的解码、同步和渲染才有准确的基础数据。</string>
+    <string name="detail_movie_prober_practice">建议先做本地文件探测，再扩展到网络流。展示时把流索引、编解码器名称、分辨率、声道数、采样率、时长等信息分块输出，便于调试和核对。</string>
+
+    <string name="detail_read_packet_overview">Read Packet 页面对齐 demux 阶段，也就是从容器里持续读取 AVPacket。这里读到的是压缩后的音视频包，还不是最终可播放的原始帧。</string>
+    <string name="detail_read_packet_focus">学习重点在于区分 packet 和 frame，理解 stream_index、pts、dts、duration 的含义，以及 EOF、seek、网络抖动时读取接口的返回值该如何处理。</string>
+    <string name="detail_read_packet_practice">可以先做一个 packet 日志页，持续打印每个包的流类型、时间戳和大小。确认 demux 正常后，再把不同流的包分发给各自的解码线程。</string>
+
+    <string name="detail_decode_packet_overview">Decode Packet 页面对齐解码阶段。它把压缩包送入解码器，再循环取出 AVFrame，最终得到 YUV 视频帧或 PCM 音频帧。</string>
+    <string name="detail_decode_packet_focus">这里的关键是 send/receive 模式、解码缓存、B 帧导致的时序变化，以及 flush 时剩余帧的排空逻辑。只理解旧式 decode API 往往不够，最好直接熟悉现代接口。</string>
+    <string name="detail_decode_packet_practice">实践时先独立验证音频解码和视频解码。视频侧可以输出帧尺寸和像素格式，音频侧可以输出采样率、声道布局和样本格式，确认原始数据路径完全打通。</string>
+
+    <string name="detail_custom_decoder_overview">Custom Decoder 是把解码器进一步对象化。它通常会封装打开、送包、取帧、flush、release 等动作，让播放器上层不用直接面对大量 FFmpeg 原生接口。</string>
+    <string name="detail_custom_decoder_focus">重点在于职责边界划分。一个好的 Decoder 类要清楚管理 codec context、packet/frame 临时对象、错误状态和线程协作，而不是把所有逻辑都塞在 Activity 或 Player 主类里。</string>
+    <string name="detail_custom_decoder_practice">建议先从视频解码器类开始抽象，再用类似接口扩展到音频。接口尽量保持统一，比如 open、pushPacket、drainFrame、flush、close，这样后续同步模块更容易接入。</string>
+
+    <string name="detail_core_animation_overview">Core Animation/Core Graphics/Core Media 这组能力对应系统级视频显示链路。虽然 Android 端不会直接使用这些 iOS/macOS 框架，但它们代表的是一种“系统表面 + 像素缓冲”渲染思路。</string>
+    <string name="detail_core_animation_focus">这类渲染方式的核心在于像素缓冲格式、颜色空间转换、图层提交和显示同步。理解这条链路，有助于你在 Android 侧对比 Surface、Canvas、ImageReader 这类机制的优劣。</string>
+    <string name="detail_core_animation_practice">如果要把这个概念迁移到当前工程，建议把它视为“平台渲染抽象”的一个案例：输入是统一视频帧，输出是平台相关的渲染目标，中间增加颜色转换和缓冲管理层。</string>
+
+    <string name="detail_legacy_opengl_overview">Legacy OpenGL 展示的是固定管线时代的视频渲染方式。它适合帮助理解纹理上传、像素格式转换和基础绘制流程，但不适合作为长期方案。</string>
+    <string name="detail_legacy_opengl_focus">重点在于多种像素格式如何进入显存、纹理坐标如何映射到显示区域，以及不同颜色空间在旧管线下如何做近似处理。它更像是理解 OpenGL 视频渲染的入门站点。</string>
+    <string name="detail_legacy_opengl_practice">如果你要补这一页的真实功能，可以先做一个最小 YUV420P 到 RGB 的渲染样例，明确纹理上传和屏幕输出链路，再决定是否继续保留旧管线版本。</string>
+
+    <string name="detail_modern_opengl_overview">Modern OpenGL 使用着色器完成视频帧渲染，是 Android 平台上更常见、更可维护的 GPU 渲染方案。BGRA、NV12、YUV420P 等格式都可以通过不同 shader 进行转换。</string>
+    <string name="detail_modern_opengl_focus">学习重点包括 shader 编写、三平面或双平面纹理绑定、色彩矩阵选择、顶点与纹理坐标管理，以及渲染尺寸变化时的 viewport 和裁剪逻辑。</string>
+    <string name="detail_modern_opengl_practice">建议优先把 Modern OpenGL 做成重点示例页：先支持一种最常见格式，比如 YUV420P，再逐步加 NV12、NV21 和 BGRA。等格式切换稳定后，再加入旋转、缩放和截图能力。</string>
+
+    <string name="detail_modern_opengl_rect_overview">Modern OpenGL(Rectangle Texture) 是对纹理采样方式的进一步细化。矩形纹理常用于某些平台或特定采集链路，能减少常规归一化坐标换算带来的中间层。</string>
+    <string name="detail_modern_opengl_rect_focus">这一页主要关注纹理目标类型变化后，对 shader 采样方式、坐标表达和兼容性的影响。它不是替代普通 2D texture，而是在特定场景下更合适的选择。</string>
+    <string name="detail_modern_opengl_rect_practice">当前工程如果后续要做平台对比，这一页很适合展示“相同视频帧，不同纹理目标”的渲染差异。界面上可以并排显示普通 2D 纹理和 rectangle texture 的表现对比。</string>
+
+    <string name="detail_metal_overview">Metal 页面对齐的是新一代 GPU 渲染思路。它和 Modern OpenGL 的目标相似，都是把视频帧高效送到 GPU，但资源管理、命令提交和同步模型更现代。</string>
+    <string name="detail_metal_focus">这里最值得学习的是纹理资源管理、命令缓冲、渲染管线状态对象，以及视频帧像素格式和 GPU 纹理格式之间的映射关系。即使当前工程在 Android 上，这些思想也能迁移到 Vulkan 或更现代图形接口。</string>
+    <string name="detail_metal_practice">如果后续你打算让这个教程体系跨平台，Metal 页面可以作为 iOS/macOS 版本的高级渲染分支。当前 Android 端可以先保留成知识说明页，未来再补平台实现。</string>
+
+    <string name="detail_audio_unit_overview">AudioUnit 代表的是更灵活、更底层的音频渲染路径。它适合精细控制缓冲、格式转换和设备交互，在低延迟播放场景下非常常见。</string>
+    <string name="detail_audio_unit_focus">这个模块的重点是音频回调模型、样本格式转换、重采样，以及解码线程和播放回调线程之间的数据同步。音频比视频更容易暴露卡顿和缓冲管理问题。</string>
+    <string name="detail_audio_unit_practice">在教程实现上，可以先从 PCM 队列播放开始，再逐步加格式转换和重采样。界面上建议展示当前采样率、通道数、播放缓存深度和音量等状态信息。</string>
+
+    <string name="detail_audio_queue_overview">AudioQueue 更像一条简单、稳定的音频输出链路。它适合先跑通播放流程，让你把更多精力放在解码和数据供给节奏上，而不是过早陷入复杂的底层音频细节。</string>
+    <string name="detail_audio_queue_focus">需要重点关注的是缓冲区个数、每次写入的样本量、填充节奏，以及当上游解码速度和下游播放速度不一致时，队列如何保持稳定不卡顿。</string>
+    <string name="detail_audio_queue_practice">如果你后续要在当前工程里扩展真实音频渲染示例，建议先做 AudioQueue 风格的“基础音频播放页”，确认播放链路稳定后，再升级到更低延迟、更灵活的实现。</string>
 </resources>

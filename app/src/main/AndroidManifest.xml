@@ -12,6 +12,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FFmpegAVTutorial">
         <activity
+            android:name=".FeatureDetailActivity"
+            android:exported="false" />
+        <activity
+            android:name=".FFmpegInfoActivity"
+            android:exported="false" />
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>
