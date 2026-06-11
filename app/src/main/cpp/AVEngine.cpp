@@ -16,6 +16,25 @@ extern "C" {
 }
 
 
+
+extern "C" {
+jclass NativeInstance;
+
+struct InstanceHolder {
+    //std::shared_ptr<PlatformContext> _platformContext;
+};
+
+jlong getInstanceHolderId(JNIEnv *env, jobject obj) {
+    return env->GetLongField(obj, env->GetFieldID(NativeInstance, "nativePtr", "J"));
+}
+
+InstanceHolder *getInstanceHolder(JNIEnv *env, jobject obj) {
+    return reinterpret_cast<InstanceHolder *>(getInstanceHolderId(env, obj));
+}
+
+
+}
+
 namespace {
 
     std::string VersionToString(unsigned version) {
@@ -153,8 +172,8 @@ extern "C"
 JNIEXPORT jlong JNICALL
 Java_io_ffmpegtutotial_player_internal_NativeInstance_makeNativeInstance(JNIEnv *env, jobject obj,
                                                                          jobject instance) {
-
-    return 0;
+    auto *holder = new InstanceHolder();
+    return reinterpret_cast<jlong>(holder);
 }
 
 
