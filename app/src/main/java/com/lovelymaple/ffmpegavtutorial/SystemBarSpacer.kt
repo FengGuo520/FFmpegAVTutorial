@@ -26,3 +26,15 @@ internal fun setupStatusBarSpace(
         insets
     }
 }
+
+internal fun setupNavigationBarSpace(navigationBarSpace: View) {
+    ViewCompat.setOnApplyWindowInsetsListener(navigationBarSpace) { view, insets ->
+        val bottomInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+        val params = view.layoutParams
+        if (params.height != bottomInset) {
+            params.height = bottomInset
+            view.layoutParams = params
+        }
+        insets
+    }
+}

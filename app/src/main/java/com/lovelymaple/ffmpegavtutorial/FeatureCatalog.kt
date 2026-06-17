@@ -16,6 +16,12 @@ data class FeatureItem(
 
 sealed interface FeatureDestination {
     data object FFmpegInfo : FeatureDestination
+    data object CameraPreview : FeatureDestination
+    data object AudioCapture : FeatureDestination
+    data object H264Encode : FeatureDestination
+    data object AacEncode : FeatureDestination
+    data object FlvMux : FeatureDestination
+    data object LiveFlvMux : FeatureDestination
     data class Detail(val featureId: String) : FeatureDestination
 }
 
@@ -35,6 +41,12 @@ object FeatureCatalog {
         FeatureSection(
             titleRes = R.string.section_basic,
             items = listOf(
+                FeatureItem(
+                    id = "camera_preview",
+                    titleRes = R.string.feature_camera_preview_title,
+                    summaryRes = R.string.feature_camera_preview_summary,
+                    destination = FeatureDestination.CameraPreview
+                ),
                 FeatureItem(
                     id = "opengl_version",
                     titleRes = R.string.feature_opengl_version_title,
@@ -58,6 +70,12 @@ object FeatureCatalog {
                     titleRes = R.string.feature_read_packet_title,
                     summaryRes = R.string.feature_read_packet_summary,
                     destination = FeatureDestination.Detail("read_packet")
+                ),
+                FeatureItem(
+                    id = "h264_encode",
+                    titleRes = R.string.feature_h264_encode_title,
+                    summaryRes = R.string.feature_h264_encode_summary,
+                    destination = FeatureDestination.H264Encode
                 ),
                 FeatureItem(
                     id = "decode_packet",
@@ -112,6 +130,18 @@ object FeatureCatalog {
             titleRes = R.string.section_audio_render,
             items = listOf(
                 FeatureItem(
+                    id = "audio_capture",
+                    titleRes = R.string.feature_audio_capture_title,
+                    summaryRes = R.string.feature_audio_capture_summary,
+                    destination = FeatureDestination.AudioCapture
+                ),
+                FeatureItem(
+                    id = "aac_encode",
+                    titleRes = R.string.feature_aac_encode_title,
+                    summaryRes = R.string.feature_aac_encode_summary,
+                    destination = FeatureDestination.AacEncode
+                ),
+                FeatureItem(
                     id = "audio_unit",
                     titleRes = R.string.feature_audio_unit_title,
                     summaryRes = R.string.feature_audio_unit_summary,
@@ -122,6 +152,23 @@ object FeatureCatalog {
                     titleRes = R.string.feature_audio_queue_title,
                     summaryRes = R.string.feature_audio_queue_summary,
                     destination = FeatureDestination.Detail("audio_queue")
+                )
+            )
+        ),
+        FeatureSection(
+            titleRes = R.string.section_mux_container,
+            items = listOf(
+                FeatureItem(
+                    id = "flv_mux",
+                    titleRes = R.string.feature_flv_mux_title,
+                    summaryRes = R.string.feature_flv_mux_summary,
+                    destination = FeatureDestination.FlvMux
+                ),
+                FeatureItem(
+                    id = "live_flv_mux",
+                    titleRes = R.string.feature_live_flv_mux_title,
+                    summaryRes = R.string.feature_live_flv_mux_summary,
+                    destination = FeatureDestination.LiveFlvMux
                 )
             )
         )

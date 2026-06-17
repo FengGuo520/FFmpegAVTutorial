@@ -19,6 +19,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         supportActionBar?.hide()
         setupStatusBarSpace(this, binding.statusBarSpace, lightStatusBarIcons = true)
+        setupNavigationBarSpace(binding.navigationBarSpace)
         renderFeatureCatalog()
     }
 
@@ -39,6 +40,24 @@ class MainActivity : AppCompatActivity() {
                     when (val destination = item.destination) {
                         FeatureDestination.FFmpegInfo -> {
                             startActivity(Intent(this, FFmpegInfoActivity::class.java))
+                        }
+                        FeatureDestination.CameraPreview -> {
+                            startActivity(Intent(this, CameraPreviewActivity::class.java))
+                        }
+                        FeatureDestination.AudioCapture -> {
+                            startActivity(Intent(this, AudioCaptureActivity::class.java))
+                        }
+                        FeatureDestination.AacEncode -> {
+                            startActivity(Intent(this, AacEncodeActivity::class.java))
+                        }
+                        FeatureDestination.FlvMux -> {
+                            startActivity(Intent(this, FlvMuxActivity::class.java))
+                        }
+                        FeatureDestination.LiveFlvMux -> {
+                            startActivity(Intent(this, LiveFlvMuxActivity::class.java))
+                        }
+                        FeatureDestination.H264Encode -> {
+                            startActivity(Intent(this, H264EncodeActivity::class.java))
                         }
                         is FeatureDestination.Detail -> {
                             startActivity(

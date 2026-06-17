@@ -47,6 +47,7 @@ class FFmpegInfoActivity : AppCompatActivity() {
 
         supportActionBar?.hide()
         setupStatusBarSpace(this, binding.statusBarSpace, lightStatusBarIcons = false)
+        setupNavigationBarSpace(binding.navigationBarSpace)
         binding.backButton.setOnClickListener {
             finish()
         }

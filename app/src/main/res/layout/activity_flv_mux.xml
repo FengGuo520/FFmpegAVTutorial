@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="#F4F7FB"
     android:orientation="vertical"
-    tools:context=".FFmpegInfoActivity">
+    tools:context=".FlvMuxActivity">
 
     <View
         android:id="@+id/status_bar_space"
@@ -15,7 +15,6 @@
         android:background="?attr/colorPrimary" />
 
     <LinearLayout
-        android:id="@+id/title_bar"
         android:layout_width="match_parent"
         android:layout_height="56dp"
         android:background="?attr/colorPrimary"
@@ -37,7 +36,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
-            android:text="@string/ffmpeg_info_page_title"
+            android:text="@string/flv_mux_page_title"
             android:textColor="@android:color/white"
             android:textSize="20sp"
             android:textStyle="bold" />
@@ -78,7 +77,7 @@
                         android:paddingTop="4dp"
                         android:paddingEnd="10dp"
                         android:paddingBottom="4dp"
-                        android:text="FFmpeg Runtime"
+                        android:text="@string/flv_mux_badge"
                         android:textColor="#355070"
                         android:textSize="12sp"
                         android:textStyle="bold" />
@@ -87,57 +86,108 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="14dp"
-                        android:text="Browse FFmpeg capabilities by section"
+                        android:text="@string/flv_mux_headline"
                         android:textColor="#0F172A"
                         android:textSize="22sp"
                         android:textStyle="bold" />
 
                     <TextView
-                        android:id="@+id/subtitle_text"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:lineSpacingExtra="2dp"
-                        android:text="@string/ffmpeg_info_subtitle"
+                        android:text="@string/flv_mux_description"
                         android:textColor="#475569"
                         android:textSize="14sp" />
 
-                    <com.google.android.material.chip.ChipGroup
-                        android:id="@+id/summary_chip_group"
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <Button
+                            android:id="@+id/refresh_button"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/flv_mux_refresh" />
+
+                        <Button
+                            android:id="@+id/start_button"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:layout_weight="1"
+                            android:text="@string/flv_mux_start" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/status_text"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
-                        app:chipSpacingHorizontal="8dp"
-                        app:chipSpacingVertical="8dp"
-                        app:singleLine="false" />
-
-                    <Button
-                        android:id="@+id/refresh_button"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="18dp"
-                        android:text="@string/refresh_ffmpeg_info" />
+                        android:background="#F8FAFC"
+                        android:padding="14dp"
+                        android:text="@string/flv_mux_status_idle"
+                        android:textColor="#334155"
+                        android:textSize="14sp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <TextView
-                android:id="@+id/error_text"
+            <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:background="#FFF1F2"
-                android:padding="14dp"
-                android:textColor="#B42318"
-                android:textSize="14sp"
-                android:visibility="gone"
-                tools:text="Failed to load FFmpeg info. Please try again." />
+                app:cardBackgroundColor="#FFFFFF"
+                app:cardCornerRadius="24dp"
+                app:cardElevation="0dp"
+                app:strokeColor="#D9E2F2"
+                app:strokeWidth="1dp">
 
-            <LinearLayout
-                android:id="@+id/section_container"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:orientation="vertical" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/flv_mux_snapshot_title"
+                        android:textColor="#0F172A"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/video_input_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:textColor="#334155"
+                        android:textSize="14sp"
+                        tools:text="Video input: /data/user/0/.../video_20260617_110000.h264" />
+
+                    <TextView
+                        android:id="@+id/audio_input_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:textColor="#334155"
+                        android:textSize="14sp"
+                        tools:text="Audio input: /data/user/0/.../audio_20260617_110000.aac" />
+
+                    <TextView
+                        android:id="@+id/output_path_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:textColor="#334155"
+                        android:textSize="14sp"
+                        tools:text="Output FLV: /data/user/0/.../mux_20260617_110100.flv" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
