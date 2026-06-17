@@ -1,4 +1,4 @@
-package com.lovelymaple.ffmpegavtutorial
+package com.lovelymaple.ffmpegavtutorial.audio
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -6,11 +6,15 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.lovelymaple.ffmpegavtutorial.R
 import com.lovelymaple.ffmpegavtutorial.databinding.ActivityAudioCaptureBinding
+import com.lovelymaple.ffmpegavtutorial.ui.setupNavigationBarSpace
+import com.lovelymaple.ffmpegavtutorial.ui.setupStatusBarSpace
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -22,6 +26,10 @@ import kotlin.concurrent.thread
 import kotlin.math.sqrt
 
 class AudioCaptureActivity : AppCompatActivity() {
+
+    private companion object {
+        const val TAG = "AudioCaptureActivity"
+    }
 
     private lateinit var binding: ActivityAudioCaptureBinding
 
@@ -35,6 +43,7 @@ class AudioCaptureActivity : AppCompatActivity() {
     private var bufferSizeInBytes: Int = 0
     private var currentOutputFile: File? = null
     private var currentWaveFile: File? = null
+    private var captureLoopCount = 0L
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -125,6 +134,7 @@ class AudioCaptureActivity : AppCompatActivity() {
         audioRecord = recorder
         currentOutputFile = outputFile
         currentWaveFile = createWaveFile(outputFile)
+        captureLoopCount = 0L
         isCapturing = true
         updatePermissionUi()
         updateStatus(getString(R.string.audio_capture_status_starting))
@@ -149,6 +159,13 @@ class AudioCaptureActivity : AppCompatActivity() {
                     if (read > 0) {
                         outputStream.write(byteBuffer, 0, read)
                         val level = calculateLevel(byteBuffer, read)
+                        captureLoopCount += 1
+                        if (captureLoopCount <= 5 || captureLoopCount % 20L == 0L) {
+                            Log.d(
+                                TAG,
+                                "captureLoop=$captureLoopCount read=$read level=$level firstSample=${read / 2} bufferSizeInBytes=$bufferSizeInBytes"
+                            )
+                        }
                         postUi {
                             binding.levelProgress.progress = level
                             binding.levelText.text =
@@ -308,6 +325,13 @@ class AudioCaptureActivity : AppCompatActivity() {
         }
         val rms = sqrt(sum / sampleCount.coerceAtLeast(1))
         return ((rms / Short.MAX_VALUE) * 100.0).toInt().coerceIn(0, 100)
+    }
+
+    private fun readFirstSample(buffer: ByteArray, count: Int): Int {
+        if (count < 2) return 0
+        val low = buffer[0].toInt() and 0xFF
+        val high = buffer[1].toInt()
+        return ((high shl 8) or low).toShort().toInt()
     }
 
     private fun createOutputFile(): File {

@@ -1,4 +1,4 @@
-package com.lovelymaple.ffmpegavtutorial
+package com.lovelymaple.ffmpegavtutorial.ui
 
 import android.graphics.Color
 import android.view.View

@@ -1,8 +1,11 @@
-package com.lovelymaple.ffmpegavtutorial
+package com.lovelymaple.ffmpegavtutorial.container
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import com.lovelymaple.ffmpegavtutorial.R
 import com.lovelymaple.ffmpegavtutorial.databinding.ActivityFlvMuxBinding
+import com.lovelymaple.ffmpegavtutorial.ui.setupNavigationBarSpace
+import com.lovelymaple.ffmpegavtutorial.ui.setupStatusBarSpace
 import io.ffmpegtutotial.player.internal.NativeInstance
 import java.io.File
 import java.text.SimpleDateFormat

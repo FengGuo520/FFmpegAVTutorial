@@ -1,8 +1,11 @@
-package com.lovelymaple.ffmpegavtutorial
+package com.lovelymaple.ffmpegavtutorial.home
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import com.lovelymaple.ffmpegavtutorial.R
 import com.lovelymaple.ffmpegavtutorial.databinding.ActivityFeatureDetailBinding
+import com.lovelymaple.ffmpegavtutorial.ui.setupNavigationBarSpace
+import com.lovelymaple.ffmpegavtutorial.ui.setupStatusBarSpace
 
 class FeatureDetailActivity : AppCompatActivity() {
 

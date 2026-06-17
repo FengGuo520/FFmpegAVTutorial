@@ -1,4 +1,4 @@
-package com.lovelymaple.ffmpegavtutorial
+package com.lovelymaple.ffmpegavtutorial.container
 
 import android.Manifest
 import android.content.Context
@@ -21,6 +21,7 @@ import android.media.MediaRecorder
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Looper
 import android.util.Size
 import android.view.Surface
 import android.view.TextureView
@@ -28,23 +29,23 @@ import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.lovelymaple.ffmpegavtutorial.databinding.ActivityLiveFlvMuxBinding
+import com.lovelymaple.ffmpegavtutorial.R
+import com.lovelymaple.ffmpegavtutorial.databinding.ActivityRtmpPushBinding
+import com.lovelymaple.ffmpegavtutorial.ui.setupNavigationBarSpace
+import com.lovelymaple.ffmpegavtutorial.ui.setupStatusBarSpace
 import io.ffmpegtutotial.player.internal.NativeInstance
-import java.io.File
-import java.nio.ByteBuffer
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import kotlin.concurrent.thread
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-class LiveFlvMuxActivity : AppCompatActivity() {
+class RtmpPushActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityLiveFlvMuxBinding
+    private lateinit var binding: ActivityRtmpPushBinding
     private lateinit var nativeInstance: NativeInstance
 
     private val cameraManager by lazy { getSystemService(Context.CAMERA_SERVICE) as CameraManager }
+    private val preferences by lazy { getSharedPreferences("rtmp_push_demo", Context.MODE_PRIVATE) }
+    private val reconnectHandler = Handler(Looper.getMainLooper())
 
     private val encodeWidth = 1280
     private val encodeHeight = 720
@@ -55,6 +56,9 @@ class LiveFlvMuxActivity : AppCompatActivity() {
     private val audioChannelConfig = AudioFormat.CHANNEL_IN_MONO
     private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
     private val audioBitrate = 128_000
+    private val maxReconnectAttempts = 5
+    private val reconnectDelayMs = 2_000L
+    private val pendingPacketLimit = 180
 
     private var cameraDevice: CameraDevice? = null
     private var cameraCaptureSession: CameraCaptureSession? = null
@@ -79,9 +83,12 @@ class LiveFlvMuxActivity : AppCompatActivity() {
 
     private var videoDrainThread: Thread? = null
     private var audioEncodeThread: Thread? = null
-    private var outputFile: File? = null
     private var fatalErrorMessage: String? = null
     private var muxerStarted = false
+    private var reconnectScheduled = false
+    private var reconnectAttempt = 0
+    private var targetUrl: String? = null
+    private var lastConnectionError: String? = null
     private var videoPacketCount = 0
     private var audioPacketCount = 0
     private var videoCsd0: ByteArray? = null
@@ -100,6 +107,19 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         val flags: Int
     )
 
+    private val reconnectRunnable = Runnable {
+        synchronized(muxerLock) {
+            reconnectScheduled = false
+            if (!isStreaming || isStopping) {
+                return@synchronized
+            }
+            postUi {
+                updateStatus(getString(R.string.rtmp_push_status_retrying_now))
+            }
+            maybeStartMuxerLocked()
+        }
+    }
+
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ ->
             updateControls()
@@ -107,7 +127,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
                 openCameraWhenReady()
             }
             if (!hasAllPermissions()) {
-                updateStatus(getString(R.string.live_flv_mux_status_permission_required))
+                updateStatus(getString(R.string.rtmp_push_status_permission_required))
             }
         }
 
@@ -138,7 +158,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
             cameraDevice = null
             postUi {
                 binding.previewPlaceholder.visibility = View.VISIBLE
-                handleFatalError("camera disconnected")
+                handleCaptureFatalError("camera disconnected")
             }
         }
 
@@ -147,7 +167,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
             cameraDevice = null
             postUi {
                 binding.previewPlaceholder.visibility = View.VISIBLE
-                handleFatalError("camera error $error")
+                handleCaptureFatalError("camera error $error")
             }
         }
     }
@@ -155,7 +175,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        binding = ActivityLiveFlvMuxBinding.inflate(layoutInflater)
+        binding = ActivityRtmpPushBinding.inflate(layoutInflater)
         setContentView(binding.root)
         supportActionBar?.hide()
         setupStatusBarSpace(this, binding.statusBarSpace, lightStatusBarIcons = false)
@@ -169,6 +189,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         binding.startButton.setOnClickListener { ensurePermissionsAndStart() }
         binding.stopButton.setOnClickListener { stopStreaming() }
         binding.previewTexture.surfaceTextureListener = surfaceTextureListener
+        binding.urlInput.setText(preferences.getString(KEY_LAST_RTMP_URL, ""))
 
         updateStaticInfo()
         updateControls()
@@ -224,7 +245,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         if (!hasCameraPermission()) {
             binding.previewPlaceholder.visibility = View.VISIBLE
             binding.previewPlaceholder.text =
-                getString(R.string.live_flv_mux_status_permission_required)
+                getString(R.string.rtmp_push_status_permission_required)
             return
         }
         if (!binding.previewTexture.isAvailable) {
@@ -244,7 +265,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         try {
             val cameraId = findCameraId(currentLensFacing)
             if (cameraId == null) {
-                val message = getString(R.string.live_flv_mux_status_no_camera, currentLensLabel())
+                val message = getString(R.string.rtmp_push_status_no_camera, currentLensLabel())
                 binding.previewPlaceholder.visibility = View.VISIBLE
                 binding.previewPlaceholder.text = message
                 updateStatus(message)
@@ -254,7 +275,12 @@ class LiveFlvMuxActivity : AppCompatActivity() {
             val map =
                 characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
                     ?: run {
-                        updateStatus(getString(R.string.live_flv_mux_status_error, "preview output unavailable"))
+                        updateStatus(
+                            getString(
+                                R.string.rtmp_push_status_error,
+                                "preview output unavailable"
+                            )
+                        )
                         return
                     }
             previewSize = choosePreviewSize(
@@ -263,15 +289,20 @@ class LiveFlvMuxActivity : AppCompatActivity() {
                 binding.previewTexture.height
             )
             configureTransform(binding.previewTexture.width, binding.previewTexture.height)
-            val message = getString(R.string.live_flv_mux_status_opening, currentLensLabel())
+            val message = getString(R.string.rtmp_push_status_opening, currentLensLabel())
             binding.previewPlaceholder.visibility = View.VISIBLE
             binding.previewPlaceholder.text = message
             updateStatus(message)
             cameraManager.openCamera(cameraId, stateCallback, backgroundHandler)
         } catch (exception: CameraAccessException) {
-            updateStatus(getString(R.string.live_flv_mux_status_error, exception.message ?: "camera access error"))
+            updateStatus(
+                getString(
+                    R.string.rtmp_push_status_error,
+                    exception.message ?: "camera access error"
+                )
+            )
         } catch (exception: SecurityException) {
-            updateStatus(getString(R.string.live_flv_mux_status_permission_required))
+            updateStatus(getString(R.string.rtmp_push_status_permission_required))
         }
     }
 
@@ -321,49 +352,70 @@ class LiveFlvMuxActivity : AppCompatActivity() {
                             postUi {
                                 binding.previewPlaceholder.visibility = View.GONE
                                 updateStatus(
-                                    if (isStreaming) {
-                                        getString(R.string.live_flv_mux_status_streaming)
-                                    } else {
-                                        getString(
-                                            R.string.live_flv_mux_status_previewing,
-                                            currentLensLabel()
-                                        )
+                                    when {
+                                        isStreaming && muxerStarted && targetUrl != null -> {
+                                            getString(
+                                                R.string.rtmp_push_status_connected,
+                                                targetUrl.orEmpty()
+                                            )
+                                        }
+                                        isStreaming -> {
+                                            getString(R.string.rtmp_push_status_starting)
+                                        }
+                                        else -> {
+                                            getString(
+                                                R.string.rtmp_push_status_previewing,
+                                                currentLensLabel()
+                                            )
+                                        }
                                     }
                                 )
                             }
                         } catch (exception: CameraAccessException) {
-                            handleFatalError(exception.message ?: "failed to start camera session")
+                            handleCaptureFatalError(
+                                exception.message ?: "failed to start camera session"
+                            )
                         }
                     }
 
                     override fun onConfigureFailed(session: CameraCaptureSession) {
-                        handleFatalError("camera session configuration failed")
+                        handleCaptureFatalError("camera session configuration failed")
                     }
                 },
                 backgroundHandler
             )
         } catch (exception: CameraAccessException) {
-            updateStatus(getString(R.string.live_flv_mux_status_error, exception.message ?: "camera session error"))
+            updateStatus(
+                getString(
+                    R.string.rtmp_push_status_error,
+                    exception.message ?: "camera session error"
+                )
+            )
         }
     }
 
     private fun startStreaming() {
         if (isStreaming || isStopping) return
         if (!hasAllPermissions()) {
-            updateStatus(getString(R.string.live_flv_mux_status_permission_required))
+            updateStatus(getString(R.string.rtmp_push_status_permission_required))
             return
         }
 
+        val inputUrl = binding.urlInput.text?.toString()?.trim().orEmpty()
+        if (inputUrl.isEmpty()) {
+            updateStatus(getString(R.string.rtmp_push_url_empty))
+            return
+        }
+
+        preferences.edit().putString(KEY_LAST_RTMP_URL, inputUrl).apply()
+        targetUrl = inputUrl
         fatalErrorMessage = null
-        outputFile = createOutputFile()
+        lastConnectionError = null
+        reconnectAttempt = 0
         videoPacketCount = 0
         audioPacketCount = 0
         updatePacketCountTexts()
-        binding.outputPathText.text =
-            getString(
-                R.string.live_flv_mux_output_path_value,
-                outputFile?.absolutePath ?: getString(R.string.h264_encode_output_path_empty)
-            )
+        updateRuntimeTexts()
 
         try {
             resetMuxerState()
@@ -378,14 +430,14 @@ class LiveFlvMuxActivity : AppCompatActivity() {
             }
             startVideoDrainThread()
             startAudioEncodeThread()
-            updateStatus(getString(R.string.live_flv_mux_status_starting))
+            updateStatus(getString(R.string.rtmp_push_status_starting))
         } catch (exception: Exception) {
-            fatalErrorMessage = exception.message ?: "failed to start live FLV pipeline"
+            fatalErrorMessage = exception.message ?: "failed to start RTMP push"
             releaseVideoEncoder()
             releaseAudioPipeline()
             resetMuxerState()
             updateControls()
-            updateStatus(getString(R.string.live_flv_mux_status_error, fatalErrorMessage!!))
+            updateStatus(getString(R.string.rtmp_push_status_error, fatalErrorMessage!!))
         }
     }
 
@@ -398,29 +450,28 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         isStopping = true
         val statusBeforeStop = fatalErrorMessage
         isStreaming = false
+        reconnectHandler.removeCallbacks(reconnectRunnable)
 
         try {
             videoCodec?.signalEndOfInputStream()
         } catch (_: Exception) {
         }
 
-        audioEncodeThread?.join(2000)
+        audioEncodeThread?.join(2_000)
         audioEncodeThread = null
-        videoDrainThread?.join(2000)
+        videoDrainThread?.join(2_000)
         videoDrainThread = null
 
-        val muxSummary = synchronized(muxerLock) {
-            val summary = if (muxerStarted) {
+        synchronized(muxerLock) {
+            reconnectScheduled = false
+            if (muxerStarted) {
                 muxerStarted = false
-                nativeInstance.closeLiveFlvMuxer()
-            } else {
-                null
+                nativeInstance.closeRtmpPush()
             }
             pendingPackets.clear()
             videoCsd0 = null
             videoCsd1 = null
             audioCsd0 = null
-            summary
         }
 
         releaseAudioPipeline()
@@ -433,23 +484,20 @@ class LiveFlvMuxActivity : AppCompatActivity() {
             }
             val finalMessage = when {
                 statusBeforeStop != null -> {
-                    getString(R.string.live_flv_mux_status_error, statusBeforeStop)
-                }
-                muxSummary != null && muxSummary.startsWith("ERROR:") -> {
-                    getString(R.string.live_flv_mux_status_error, muxSummary)
-                }
-                muxSummary != null -> {
-                    muxSummary
+                    getString(R.string.rtmp_push_status_error, statusBeforeStop)
                 }
                 else -> {
-                    getString(R.string.live_flv_mux_status_stopped)
+                    getString(R.string.rtmp_push_status_disconnected)
                 }
             }
             updateStatus(finalMessage)
         }
 
         fatalErrorMessage = null
+        lastConnectionError = null
+        reconnectAttempt = 0
         isStopping = false
+        updateRuntimeTexts()
     }
 
     private fun setupVideoEncoder() {
@@ -517,7 +565,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
 
     private fun startVideoDrainThread() {
         val codec = videoCodec ?: return
-        videoDrainThread = thread(start = true, name = "LiveFlvVideoDrain") {
+        videoDrainThread = thread(start = true, name = "RtmpVideoDrain") {
             val bufferInfo = MediaCodec.BufferInfo()
             var outputEnded = false
             while (!outputEnded) {
@@ -558,7 +606,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
     private fun startAudioEncodeThread() {
         val recorder = audioRecord ?: return
         val codec = audioCodec ?: return
-        audioEncodeThread = thread(start = true, name = "LiveFlvAudioEncode") {
+        audioEncodeThread = thread(start = true, name = "RtmpAudioEncode") {
             val pcmBuffer = ByteArray(audioBufferSizeInBytes)
             val bufferInfo = MediaCodec.BufferInfo()
             var presentationTimeUs = 0L
@@ -567,7 +615,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
                 recorder.startRecording()
                 postUi {
                     if (isStreaming) {
-                        updateStatus(getString(R.string.live_flv_mux_status_streaming))
+                        updateStatus(getString(R.string.rtmp_push_status_streaming))
                     }
                 }
 
@@ -583,7 +631,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
                                 getString(R.string.audio_capture_level_value, level)
                         }
                     } else if (read < 0) {
-                        handleFatalError("AudioRecord read returned $read")
+                        handleCaptureFatalError("AudioRecord read returned $read")
                         break
                     }
                 }
@@ -592,7 +640,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
                 queueAudioEndOfStream(codec, presentationTimeUs)
                 drainAudioEncoder(codec, bufferInfo, true)
             } catch (exception: Exception) {
-                handleFatalError(exception.message ?: "audio encode failed")
+                handleCaptureFatalError(exception.message ?: "audio encode failed")
             } finally {
                 if (!eosQueued) {
                     try {
@@ -690,7 +738,10 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         synchronized(muxerLock) {
             if (!muxerStarted) {
                 pendingPackets.add(PendingPacket(isVideo, data, normalizedPtsUs, flags))
-                maybeStartMuxerLocked()
+                trimPendingPacketsLocked()
+                if (!reconnectScheduled) {
+                    maybeStartMuxerLocked()
+                }
                 return
             }
             writePacketLocked(PendingPacket(isVideo, data, normalizedPtsUs, flags))
@@ -698,13 +749,17 @@ class LiveFlvMuxActivity : AppCompatActivity() {
     }
 
     private fun maybeStartMuxerLocked() {
-        if (muxerStarted) return
+        if (muxerStarted || reconnectScheduled || !isStreaming || isStopping) return
         val videoConfig = videoCsd0 ?: return
         val audioConfig = audioCsd0 ?: return
-        val file = outputFile ?: return
+        val url = targetUrl ?: return
 
-        val result = nativeInstance.openLiveFlvMuxer(
-            file.absolutePath,
+        postUi {
+            updateStatus(getString(R.string.rtmp_push_status_connecting, url))
+        }
+
+        val result = nativeInstance.openRtmpPush(
+            url,
             encodeWidth,
             encodeHeight,
             encodeFrameRate,
@@ -718,37 +773,40 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         )
 
         if (!result.startsWith("OK:")) {
-            handleFatalError(result)
+            scheduleReconnectLocked(sanitizeNativeMessage(result))
             return
         }
 
         muxerStarted = true
+        reconnectAttempt = 0
+        lastConnectionError = null
         val packetsToFlush = pendingPackets.sortedBy { it.ptsUs }
         pendingPackets.clear()
         packetsToFlush.forEach { packet ->
             writePacketLocked(packet)
         }
         postUi {
-            updateStatus(
-                getString(
-                    R.string.live_flv_mux_status_muxer_ready,
-                    file.absolutePath
-                )
-            )
+            updateRuntimeTexts()
+            updateStatus(getString(R.string.rtmp_push_status_connected, url))
         }
     }
 
     private fun writePacketLocked(packet: PendingPacket) {
         val result =
             if (packet.isVideo) {
-                nativeInstance.writeLiveVideoPacket(packet.data, packet.ptsUs, packet.flags)
+                nativeInstance.writeRtmpVideoPacket(packet.data, packet.ptsUs, packet.flags)
             } else {
-                nativeInstance.writeLiveAudioPacket(packet.data, packet.ptsUs, packet.flags)
+                nativeInstance.writeRtmpAudioPacket(packet.data, packet.ptsUs, packet.flags)
             }
 
         if (result < 0) {
-            handleFatalError(
-                (if (packet.isVideo) "video" else "audio") + " packet write failed: $result"
+            muxerStarted = false
+            nativeInstance.closeRtmpPush()
+            scheduleReconnectLocked(
+                sanitizeNativeMessage(
+                    (if (packet.isVideo) "video" else "audio") +
+                        " packet write failed: $result"
+                )
             )
             return
         }
@@ -763,9 +821,49 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         }
     }
 
-    private fun handleFatalError(message: String) {
+    private fun scheduleReconnectLocked(reason: String) {
+        if (!isStreaming || isStopping) return
+        if (reconnectScheduled) return
+
+        reconnectAttempt += 1
+        lastConnectionError = reason
+        pendingPackets.clear()
+
+        if (reconnectAttempt > maxReconnectAttempts) {
+            fatalErrorMessage = "reconnect limit reached. last error: $reason"
+            postUi {
+                if (!isStopping) {
+                    stopStreaming()
+                }
+            }
+            return
+        }
+
+        reconnectScheduled = true
+        postUi {
+            updateRuntimeTexts()
+            updateStatus(
+                getString(
+                    R.string.rtmp_push_status_reconnecting,
+                    reconnectAttempt,
+                    maxReconnectAttempts,
+                    reason
+                )
+            )
+        }
+        reconnectHandler.removeCallbacks(reconnectRunnable)
+        reconnectHandler.postDelayed(reconnectRunnable, reconnectDelayMs)
+    }
+
+    private fun trimPendingPacketsLocked() {
+        while (pendingPackets.size > pendingPacketLimit) {
+            pendingPackets.removeAt(0)
+        }
+    }
+
+    private fun handleCaptureFatalError(message: String) {
         if (fatalErrorMessage != null) return
-        fatalErrorMessage = message
+        fatalErrorMessage = sanitizeNativeMessage(message)
         postUi {
             if (!isStopping) {
                 stopStreaming()
@@ -812,10 +910,12 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         synchronized(muxerLock) {
             pendingPackets.clear()
             muxerStarted = false
+            reconnectScheduled = false
             videoCsd0 = null
             videoCsd1 = null
             audioCsd0 = null
         }
+        reconnectHandler.removeCallbacks(reconnectRunnable)
         firstVideoPtsUs = null
         firstAudioPtsUs = null
     }
@@ -850,7 +950,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
 
     private fun startBackgroundThread() {
         if (backgroundThread != null) return
-        backgroundThread = HandlerThread("LiveFlvCameraThread").also { thread ->
+        backgroundThread = HandlerThread("RtmpPushCameraThread").also { thread ->
             thread.start()
             backgroundHandler = Handler(thread.looper)
         }
@@ -877,13 +977,25 @@ class LiveFlvMuxActivity : AppCompatActivity() {
             getString(R.string.audio_capture_sample_rate_value, audioSampleRate)
         binding.audioBitrateText.text =
             getString(R.string.live_flv_mux_audio_bitrate_value, audioBitrate)
-        binding.outputPathText.text =
-            getString(
-                R.string.live_flv_mux_output_path_value,
-                getString(R.string.h264_encode_output_path_empty)
-            )
         binding.levelText.text = getString(R.string.audio_capture_level_value, 0)
         updatePacketCountTexts()
+        updateRuntimeTexts()
+    }
+
+    private fun updateRuntimeTexts() {
+        val url = targetUrl ?: binding.urlInput.text?.toString()?.trim().orEmpty()
+        binding.currentUrlText.text =
+            if (url.isEmpty()) {
+                getString(R.string.rtmp_push_url_value_empty)
+            } else {
+                getString(R.string.rtmp_push_url_value, url)
+            }
+        binding.retryCountText.text =
+            if (reconnectAttempt <= 0) {
+                getString(R.string.rtmp_push_retry_idle, maxReconnectAttempts)
+            } else {
+                getString(R.string.rtmp_push_retry_value, reconnectAttempt, maxReconnectAttempts)
+            }
     }
 
     private fun updatePacketCountTexts() {
@@ -899,25 +1011,38 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         binding.switchCameraButton.isEnabled = hasCameraPermission() && !isStreaming && !isStopping
         binding.startButton.isEnabled = hasPermissions && !isStreaming && !isStopping
         binding.stopButton.isEnabled = isStreaming && !isStopping
+        binding.urlInput.isEnabled = !isStreaming && !isStopping
 
         if (!hasCameraPermission()) {
             binding.previewPlaceholder.visibility = View.VISIBLE
             binding.previewPlaceholder.text =
-                getString(R.string.live_flv_mux_status_permission_required)
+                getString(R.string.rtmp_push_status_permission_required)
         } else if (!isStreaming && cameraDevice == null) {
             binding.previewPlaceholder.visibility = View.VISIBLE
-            binding.previewPlaceholder.text = getString(R.string.live_flv_mux_status_idle)
+            binding.previewPlaceholder.text = getString(R.string.rtmp_push_status_idle)
         }
 
         if (!hasPermissions) {
-            updateStatus(getString(R.string.live_flv_mux_status_permission_required))
+            updateStatus(getString(R.string.rtmp_push_status_permission_required))
         } else if (!isStreaming && !isStopping && fatalErrorMessage == null) {
-            updateStatus(getString(R.string.live_flv_mux_status_idle))
+            updateStatus(getString(R.string.rtmp_push_status_idle))
         }
+
+        updateRuntimeTexts()
     }
 
     private fun updateStatus(text: String) {
         binding.statusText.text = text
+    }
+
+    private fun sanitizeNativeMessage(message: String): String {
+        return message
+            .removePrefix("ERROR: ")
+            .replace("live FLV output file", "RTMP output")
+            .replace("live FLV header", "RTMP/FLV header")
+            .replace("live FLV muxer", "RTMP pusher")
+            .replace("Live FLV mux", "RTMP push")
+            .trim()
     }
 
     private fun currentLensLabel(): String {
@@ -978,12 +1103,6 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         textureView.setTransform(matrix)
     }
 
-    private fun createOutputFile(): File {
-        val liveDir = File(filesDir, "live").apply { mkdirs() }
-        val formatter = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
-        return File(liveDir, "live_${formatter.format(Date())}.flv")
-    }
-
     private fun cloneBuffer(format: MediaFormat, key: String): ByteArray? {
         val buffer = format.getByteBuffer(key) ?: return null
         val duplicate = buffer.duplicate()
@@ -1022,5 +1141,9 @@ class LiveFlvMuxActivity : AppCompatActivity() {
                 action()
             }
         }
+    }
+
+    private companion object {
+        const val KEY_LAST_RTMP_URL = "last_rtmp_url"
     }
 }

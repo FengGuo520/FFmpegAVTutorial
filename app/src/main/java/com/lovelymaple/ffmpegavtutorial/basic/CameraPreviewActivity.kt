@@ -1,4 +1,4 @@
-package com.lovelymaple.ffmpegavtutorial
+package com.lovelymaple.ffmpegavtutorial.basic
 
 import android.Manifest
 import android.content.Context
@@ -22,7 +22,10 @@ import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.lovelymaple.ffmpegavtutorial.R
 import com.lovelymaple.ffmpegavtutorial.databinding.ActivityCameraPreviewBinding
+import com.lovelymaple.ffmpegavtutorial.ui.setupNavigationBarSpace
+import com.lovelymaple.ffmpegavtutorial.ui.setupStatusBarSpace
 import java.util.Collections
 import kotlin.math.abs
 

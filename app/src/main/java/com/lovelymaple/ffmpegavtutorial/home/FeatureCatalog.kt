@@ -1,6 +1,7 @@
-package com.lovelymaple.ffmpegavtutorial
+package com.lovelymaple.ffmpegavtutorial.home
 
 import androidx.annotation.StringRes
+import com.lovelymaple.ffmpegavtutorial.R
 
 data class FeatureSection(
     @param:StringRes val titleRes: Int,
@@ -22,6 +23,7 @@ sealed interface FeatureDestination {
     data object AacEncode : FeatureDestination
     data object FlvMux : FeatureDestination
     data object LiveFlvMux : FeatureDestination
+    data object RtmpPush : FeatureDestination
     data class Detail(val featureId: String) : FeatureDestination
 }
 
@@ -169,6 +171,12 @@ object FeatureCatalog {
                     titleRes = R.string.feature_live_flv_mux_title,
                     summaryRes = R.string.feature_live_flv_mux_summary,
                     destination = FeatureDestination.LiveFlvMux
+                ),
+                FeatureItem(
+                    id = "rtmp_push",
+                    titleRes = R.string.feature_rtmp_push_title,
+                    summaryRes = R.string.feature_rtmp_push_summary,
+                    destination = FeatureDestination.RtmpPush
                 )
             )
         )

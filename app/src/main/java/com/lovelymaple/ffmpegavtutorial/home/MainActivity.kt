@@ -1,12 +1,22 @@
-package com.lovelymaple.ffmpegavtutorial
+package com.lovelymaple.ffmpegavtutorial.home
 
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import androidx.appcompat.app.AppCompatActivity
+import com.lovelymaple.ffmpegavtutorial.audio.AacEncodeActivity
+import com.lovelymaple.ffmpegavtutorial.audio.AudioCaptureActivity
+import com.lovelymaple.ffmpegavtutorial.basic.CameraPreviewActivity
+import com.lovelymaple.ffmpegavtutorial.basic.FFmpegInfoActivity
+import com.lovelymaple.ffmpegavtutorial.basic.H264EncodeActivity
+import com.lovelymaple.ffmpegavtutorial.container.FlvMuxActivity
+import com.lovelymaple.ffmpegavtutorial.container.LiveFlvMuxActivity
+import com.lovelymaple.ffmpegavtutorial.container.RtmpPushActivity
 import com.lovelymaple.ffmpegavtutorial.databinding.ActivityMainBinding
 import com.lovelymaple.ffmpegavtutorial.databinding.ItemFeatureRowBinding
 import com.lovelymaple.ffmpegavtutorial.databinding.ItemFeatureSectionBinding
+import com.lovelymaple.ffmpegavtutorial.ui.setupNavigationBarSpace
+import com.lovelymaple.ffmpegavtutorial.ui.setupStatusBarSpace
 
 class MainActivity : AppCompatActivity() {
 
@@ -55,6 +65,9 @@ class MainActivity : AppCompatActivity() {
                         }
                         FeatureDestination.LiveFlvMux -> {
                             startActivity(Intent(this, LiveFlvMuxActivity::class.java))
+                        }
+                        FeatureDestination.RtmpPush -> {
+                            startActivity(Intent(this, RtmpPushActivity::class.java))
                         }
                         FeatureDestination.H264Encode -> {
                             startActivity(Intent(this, H264EncodeActivity::class.java))

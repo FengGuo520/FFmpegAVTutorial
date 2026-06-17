@@ -1,4 +1,4 @@
-package com.lovelymaple.ffmpegavtutorial
+package com.lovelymaple.ffmpegavtutorial.basic
 
 import android.os.Bundle
 import android.transition.AutoTransition
@@ -10,9 +10,12 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
-import com.lovelymaple.ffmpegavtutorial.databinding.ActivityFfmpegInfoBinding
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
+import com.lovelymaple.ffmpegavtutorial.R
+import com.lovelymaple.ffmpegavtutorial.databinding.ActivityFfmpegInfoBinding
+import com.lovelymaple.ffmpegavtutorial.ui.setupNavigationBarSpace
+import com.lovelymaple.ffmpegavtutorial.ui.setupStatusBarSpace
 import io.ffmpegtutotial.player.internal.NativeInstance
 
 class FFmpegInfoActivity : AppCompatActivity() {

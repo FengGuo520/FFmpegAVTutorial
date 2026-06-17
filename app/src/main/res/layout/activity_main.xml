@@ -5,7 +5,7 @@
     android:layout_height="match_parent"
     android:background="#F4F4F4"
     android:orientation="vertical"
-    tools:context=".MainActivity">
+    tools:context=".home.MainActivity">
 
     <View
         android:id="@+id/status_bar_space"

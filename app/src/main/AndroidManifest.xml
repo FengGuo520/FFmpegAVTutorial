@@ -15,31 +15,34 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FFmpegAVTutorial">
         <activity
-            android:name=".LiveFlvMuxActivity"
+            android:name=".container.RtmpPushActivity"
             android:exported="false" />
         <activity
-            android:name=".FlvMuxActivity"
+            android:name=".container.LiveFlvMuxActivity"
             android:exported="false" />
         <activity
-            android:name=".AacEncodeActivity"
+            android:name=".container.FlvMuxActivity"
             android:exported="false" />
         <activity
-            android:name=".H264EncodeActivity"
+            android:name=".audio.AacEncodeActivity"
             android:exported="false" />
         <activity
-            android:name=".AudioCaptureActivity"
+            android:name=".basic.H264EncodeActivity"
             android:exported="false" />
         <activity
-            android:name=".CameraPreviewActivity"
+            android:name=".audio.AudioCaptureActivity"
             android:exported="false" />
         <activity
-            android:name=".FeatureDetailActivity"
+            android:name=".basic.CameraPreviewActivity"
             android:exported="false" />
         <activity
-            android:name=".FFmpegInfoActivity"
+            android:name=".home.FeatureDetailActivity"
             android:exported="false" />
         <activity
-            android:name=".MainActivity"
+            android:name=".basic.FFmpegInfoActivity"
+            android:exported="false" />
+        <activity
+            android:name=".home.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

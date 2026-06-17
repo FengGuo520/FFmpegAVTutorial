@@ -88,6 +88,34 @@ public class NativeInstance {
         );
     }
 
+    public String openRtmpPush(
+        String outputUrl,
+        int width,
+        int height,
+        int frameRate,
+        int videoBitrate,
+        byte[] videoCsd0,
+        byte[] videoCsd1,
+        int sampleRate,
+        int channelCount,
+        int audioBitrate,
+        byte[] audioSpecificConfig
+    ) {
+        return openLiveFlvMuxer(
+            outputUrl,
+            width,
+            height,
+            frameRate,
+            videoBitrate,
+            videoCsd0,
+            videoCsd1,
+            sampleRate,
+            channelCount,
+            audioBitrate,
+            audioSpecificConfig
+        );
+    }
+
     public int writeLiveVideoPacket(byte[] data, long ptsUs, int flags) {
         return writeLiveVideoPacket(nativePtr, data, ptsUs, flags);
     }
@@ -96,8 +124,20 @@ public class NativeInstance {
         return writeLiveAudioPacket(nativePtr, data, ptsUs, flags);
     }
 
+    public int writeRtmpVideoPacket(byte[] data, long ptsUs, int flags) {
+        return writeLiveVideoPacket(data, ptsUs, flags);
+    }
+
+    public int writeRtmpAudioPacket(byte[] data, long ptsUs, int flags) {
+        return writeLiveAudioPacket(data, ptsUs, flags);
+    }
+
     public String closeLiveFlvMuxer() {
         return closeLiveFlvMuxer(nativePtr);
+    }
+
+    public String closeRtmpPush() {
+        return closeLiveFlvMuxer();
     }
 
 //
