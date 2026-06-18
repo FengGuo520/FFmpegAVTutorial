@@ -47,6 +47,19 @@ public class NativeInstance {
 
     public native String closeLiveFlvMuxer(long nativePtr);
 
+    public native String openSoftAacEncoder(
+        long nativePtr,
+        String outputPath,
+        int sampleRate,
+        int channelCount,
+        int bitrate,
+        int profile
+    );
+
+    public native int writeSoftAacPcm(long nativePtr, byte[] pcmData, int size);
+
+    public native String closeSoftAacEncoder(long nativePtr);
+
     public long getNativePtr() {
         return nativePtr;
     }
@@ -138,6 +151,24 @@ public class NativeInstance {
 
     public String closeRtmpPush() {
         return closeLiveFlvMuxer();
+    }
+
+    public String openSoftAacEncoder(
+        String outputPath,
+        int sampleRate,
+        int channelCount,
+        int bitrate,
+        int profile
+    ) {
+        return openSoftAacEncoder(nativePtr, outputPath, sampleRate, channelCount, bitrate, profile);
+    }
+
+    public int writeSoftAacPcm(byte[] pcmData, int size) {
+        return writeSoftAacPcm(nativePtr, pcmData, size);
+    }
+
+    public String closeSoftAacEncoder() {
+        return closeSoftAacEncoder(nativePtr);
     }
 
 //

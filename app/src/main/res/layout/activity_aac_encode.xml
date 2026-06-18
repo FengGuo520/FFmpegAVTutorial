@@ -105,6 +105,225 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="18dp"
+                        android:background="#F8FAFC"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/aac_encode_capture_group_title"
+                            android:textColor="#0F172A"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/aac_encode_capture_group_summary"
+                            android:textColor="#64748B"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
+                            android:text="@string/aac_encode_sample_rate_title"
+                            android:textColor="#0F172A"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <RadioGroup
+                            android:id="@+id/sample_rate_group"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="vertical">
+
+                            <RadioButton
+                                android:id="@+id/sample_rate_44100_radio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="true"
+                                android:text="@string/aac_encode_sample_rate_44100" />
+
+                            <RadioButton
+                                android:id="@+id/sample_rate_48000_radio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:text="@string/aac_encode_sample_rate_48000" />
+                        </RadioGroup>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
+                            android:text="@string/aac_encode_channel_title"
+                            android:textColor="#0F172A"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <RadioGroup
+                            android:id="@+id/channel_mode_group"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="vertical">
+
+                            <RadioButton
+                                android:id="@+id/channel_mono_radio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/aac_encode_channel_mono" />
+
+                            <RadioButton
+                                android:id="@+id/channel_stereo_radio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:checked="true"
+                                android:text="@string/aac_encode_channel_stereo" />
+                        </RadioGroup>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:background="#F8FAFC"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/aac_encode_encoder_group_title"
+                            android:textColor="#0F172A"
+                            android:textSize="16sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/aac_encode_encoder_group_summary"
+                            android:textColor="#64748B"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
+                            android:text="@string/aac_encode_mode_title"
+                            android:textColor="#0F172A"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <RadioGroup
+                            android:id="@+id/encoding_mode_group"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="vertical">
+
+                            <RadioButton
+                                android:id="@+id/mode_hardware_radio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="true"
+                                android:text="@string/aac_encode_mode_hardware" />
+
+                            <RadioButton
+                                android:id="@+id/mode_software_radio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:text="@string/aac_encode_mode_software" />
+                        </RadioGroup>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
+                            android:text="@string/aac_encode_profile_title"
+                            android:textColor="#0F172A"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <RadioGroup
+                            android:id="@+id/profile_group"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="vertical">
+
+                            <RadioButton
+                                android:id="@+id/profile_lc_radio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="true"
+                                android:text="@string/aac_encode_profile_lc" />
+
+                            <RadioButton
+                                android:id="@+id/profile_he_radio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:text="@string/aac_encode_profile_he" />
+
+                            <RadioButton
+                                android:id="@+id/profile_he_v2_radio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:text="@string/aac_encode_profile_he_v2" />
+                        </RadioGroup>
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="16dp"
+                            android:text="@string/aac_encode_bitrate_title"
+                            android:textColor="#0F172A"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <RadioGroup
+                            android:id="@+id/bitrate_group"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:orientation="vertical">
+
+                            <RadioButton
+                                android:id="@+id/bitrate_64k_radio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:checked="true"
+                                android:text="@string/aac_encode_bitrate_64k" />
+
+                            <RadioButton
+                                android:id="@+id/bitrate_96k_radio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:text="@string/aac_encode_bitrate_96k" />
+
+                            <RadioButton
+                                android:id="@+id/bitrate_128k_radio"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="6dp"
+                                android:text="@string/aac_encode_bitrate_128k" />
+                        </RadioGroup>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
                         android:orientation="vertical">
 
                         <LinearLayout
@@ -183,10 +402,19 @@
                         android:textStyle="bold" />
 
                     <TextView
-                        android:id="@+id/sample_rate_text"
+                        android:id="@+id/mode_text"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
+                        android:textColor="#334155"
+                        android:textSize="14sp"
+                        tools:text="Mode: MediaCodec Hardware" />
+
+                    <TextView
+                        android:id="@+id/sample_rate_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
                         android:textColor="#334155"
                         android:textSize="14sp"
                         tools:text="Sample rate: 44100 Hz" />
@@ -210,6 +438,15 @@
                         tools:text="Bitrate: 128000 bps" />
 
                     <TextView
+                        android:id="@+id/profile_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="#334155"
+                        android:textSize="14sp"
+                        tools:text="AAC profile: AAC LC" />
+
+                    <TextView
                         android:id="@+id/frame_count_text"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -226,6 +463,28 @@
                         android:textColor="#334155"
                         android:textSize="14sp"
                         tools:text="AAC file: /data/user/0/.../audio_20260617_100000.aac" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:text="@string/aac_encode_probe_title"
+                        android:textColor="#0F172A"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/probe_info_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="#F8FAFC"
+                        android:lineSpacingExtra="2dp"
+                        android:padding="14dp"
+                        android:text="@string/aac_encode_probe_empty"
+                        android:textColor="#334155"
+                        android:textSize="13sp"
+                        tools:text="File probe info will appear here after encoding stops." />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

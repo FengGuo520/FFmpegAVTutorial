@@ -18,10 +18,14 @@ extern "C" {
 #include "libavcodec/avcodec.h"
 #include "libavcodec/codec.h"
 #include "libavformat/avformat.h"
+#include "libavutil/audio_fifo.h"
 #include "libavutil/avutil.h"
 #include "libavutil/channel_layout.h"
 #include "libavutil/error.h"
 #include "libavutil/mathematics.h"
+#include "libavutil/opt.h"
+#include "libavutil/samplefmt.h"
+#include "libswresample/swresample.h"
 }
 
 
@@ -41,10 +45,28 @@ struct LiveFlvMuxer {
     bool headerWritten = false;
 };
 
+struct SoftAacEncoder {
+    AVFormatContext *outputContext = nullptr;
+    AVStream *audioStream = nullptr;
+    AVCodecContext *codecContext = nullptr;
+    SwrContext *swrContext = nullptr;
+    AVAudioFifo *audioFifo = nullptr;
+    AVChannelLayout inputChannelLayout{};
+    std::string outputPath;
+    int inputSampleRate = 44100;
+    int inputChannelCount = 2;
+    int bitrate = 64000;
+    int packetCount = 0;
+    int64_t nextPts = 0;
+    bool headerWritten = false;
+};
+
 struct InstanceHolder {
     int keepalive = 1;
     std::mutex liveMuxerMutex;
     std::unique_ptr<LiveFlvMuxer> liveMuxer;
+    std::mutex softAacEncoderMutex;
+    std::unique_ptr<SoftAacEncoder> softAacEncoder;
 };
 
 jlong getInstanceHolderId(JNIEnv *env, jobject obj) {
@@ -569,6 +591,423 @@ namespace {
         }
     }
 
+    void ReleaseSoftAacEncoderResources(SoftAacEncoder *encoder, bool removeOutputFile) {
+        if (encoder == nullptr) {
+            return;
+        }
+        if (encoder->audioFifo != nullptr) {
+            av_audio_fifo_free(encoder->audioFifo);
+            encoder->audioFifo = nullptr;
+        }
+        if (encoder->swrContext != nullptr) {
+            swr_free(&encoder->swrContext);
+        }
+        if (encoder->codecContext != nullptr) {
+            avcodec_free_context(&encoder->codecContext);
+        }
+        if (encoder->outputContext != nullptr) {
+            if (!(encoder->outputContext->oformat->flags & AVFMT_NOFILE) &&
+                encoder->outputContext->pb != nullptr) {
+                avio_closep(&encoder->outputContext->pb);
+            }
+            avformat_free_context(encoder->outputContext);
+            encoder->outputContext = nullptr;
+        }
+        av_channel_layout_uninit(&encoder->inputChannelLayout);
+        if (removeOutputFile && !encoder->outputPath.empty()) {
+            std::remove(encoder->outputPath.c_str());
+        }
+    }
+
+    int ReceiveSoftAacPackets(SoftAacEncoder *encoder) {
+        if (encoder == nullptr || encoder->codecContext == nullptr || encoder->outputContext == nullptr) {
+            return AVERROR(EINVAL);
+        }
+
+        int emittedPackets = 0;
+        AVPacket *packet = av_packet_alloc();
+        if (packet == nullptr) {
+            return AVERROR(ENOMEM);
+        }
+
+        while (true) {
+            int result = avcodec_receive_packet(encoder->codecContext, packet);
+            if (result == AVERROR(EAGAIN) || result == AVERROR_EOF) {
+                av_packet_free(&packet);
+                return emittedPackets;
+            }
+            if (result < 0) {
+                av_packet_free(&packet);
+                return result;
+            }
+
+            av_packet_rescale_ts(packet, encoder->codecContext->time_base, encoder->audioStream->time_base);
+            packet->stream_index = encoder->audioStream->index;
+            packet->pos = -1;
+            result = av_interleaved_write_frame(encoder->outputContext, packet);
+            av_packet_unref(packet);
+            if (result < 0) {
+                av_packet_free(&packet);
+                return result;
+            }
+
+            encoder->packetCount += 1;
+            emittedPackets += 1;
+        }
+    }
+
+    int SendSoftAacFrame(SoftAacEncoder *encoder, AVFrame *frame) {
+        if (encoder == nullptr || encoder->codecContext == nullptr) {
+            return AVERROR(EINVAL);
+        }
+        int result = avcodec_send_frame(encoder->codecContext, frame);
+        if (result < 0) {
+            return result;
+        }
+        return ReceiveSoftAacPackets(encoder);
+    }
+
+    int EncodeSoftAacFromFifo(SoftAacEncoder *encoder, bool flushPartialFrame) {
+        if (encoder == nullptr || encoder->codecContext == nullptr || encoder->audioFifo == nullptr) {
+            return AVERROR(EINVAL);
+        }
+
+        int emittedPackets = 0;
+        const int frameSize = encoder->codecContext->frame_size;
+        if (frameSize <= 0) {
+            return AVERROR(EINVAL);
+        }
+
+        while (av_audio_fifo_size(encoder->audioFifo) >= frameSize ||
+            (flushPartialFrame && av_audio_fifo_size(encoder->audioFifo) > 0)) {
+            const int availableSamples = av_audio_fifo_size(encoder->audioFifo);
+            const int samplesToRead = flushPartialFrame ? std::min(availableSamples, frameSize) : frameSize;
+
+            AVFrame *frame = av_frame_alloc();
+            if (frame == nullptr) {
+                return AVERROR(ENOMEM);
+            }
+            frame->nb_samples = frameSize;
+            frame->format = encoder->codecContext->sample_fmt;
+            frame->sample_rate = encoder->codecContext->sample_rate;
+            int result = av_channel_layout_copy(&frame->ch_layout, &encoder->codecContext->ch_layout);
+            if (result < 0) {
+                av_frame_free(&frame);
+                return result;
+            }
+
+            result = av_frame_get_buffer(frame, 0);
+            if (result < 0) {
+                av_frame_free(&frame);
+                return result;
+            }
+
+            result = av_frame_make_writable(frame);
+            if (result < 0) {
+                av_frame_free(&frame);
+                return result;
+            }
+
+            if (samplesToRead < frameSize) {
+                av_samples_set_silence(
+                    frame->data,
+                    0,
+                    frameSize,
+                    encoder->codecContext->ch_layout.nb_channels,
+                    encoder->codecContext->sample_fmt
+                );
+            }
+
+            result = av_audio_fifo_read(encoder->audioFifo, reinterpret_cast<void **>(frame->data), samplesToRead);
+            if (result < samplesToRead) {
+                av_frame_free(&frame);
+                return AVERROR(EIO);
+            }
+
+            frame->pts = encoder->nextPts;
+            encoder->nextPts += frameSize;
+
+            result = SendSoftAacFrame(encoder, frame);
+            av_frame_free(&frame);
+            if (result < 0) {
+                return result;
+            }
+            emittedPackets += result;
+
+            if (!flushPartialFrame && av_audio_fifo_size(encoder->audioFifo) < frameSize) {
+                break;
+            }
+        }
+
+        return emittedPackets;
+    }
+
+    std::string OpenSoftAacEncoder(
+        SoftAacEncoder *encoder,
+        const std::string &outputPath,
+        int sampleRate,
+        int channelCount,
+        int bitrate,
+        int profile
+    ) {
+        if (encoder == nullptr) {
+            return "ERROR: soft AAC encoder session is null.";
+        }
+
+        const AVCodec *codec = avcodec_find_encoder(AV_CODEC_ID_AAC);
+        if (codec == nullptr) {
+            return "ERROR: FFmpeg AAC encoder is not available in this build.";
+        }
+
+        encoder->outputPath = outputPath;
+        encoder->inputSampleRate = std::max(sampleRate, 1);
+        encoder->inputChannelCount = std::max(channelCount, 1);
+        encoder->bitrate = std::max(bitrate, 1);
+
+        av_channel_layout_default(&encoder->inputChannelLayout, encoder->inputChannelCount);
+
+        int result = avformat_alloc_output_context2(
+            &encoder->outputContext,
+            nullptr,
+            "adts",
+            outputPath.c_str()
+        );
+        if (result < 0 || encoder->outputContext == nullptr) {
+            ReleaseSoftAacEncoderResources(encoder, true);
+            return "ERROR: failed to allocate ADTS output context: " +
+                AvErrorToString(result < 0 ? result : AVERROR_UNKNOWN);
+        }
+
+        encoder->audioStream = avformat_new_stream(encoder->outputContext, nullptr);
+        if (encoder->audioStream == nullptr) {
+            ReleaseSoftAacEncoderResources(encoder, true);
+            return "ERROR: failed to create AAC output stream.";
+        }
+
+        encoder->codecContext = avcodec_alloc_context3(codec);
+        if (encoder->codecContext == nullptr) {
+            ReleaseSoftAacEncoderResources(encoder, true);
+            return "ERROR: failed to allocate AAC codec context.";
+        }
+
+        encoder->codecContext->codec_type = AVMEDIA_TYPE_AUDIO;
+        encoder->codecContext->codec_id = AV_CODEC_ID_AAC;
+        encoder->codecContext->bit_rate = encoder->bitrate;
+        encoder->codecContext->profile = profile;
+        encoder->codecContext->sample_rate = encoder->inputSampleRate;
+        encoder->codecContext->time_base = AVRational{1, encoder->inputSampleRate};
+        result = av_channel_layout_copy(&encoder->codecContext->ch_layout, &encoder->inputChannelLayout);
+        if (result < 0) {
+            ReleaseSoftAacEncoderResources(encoder, true);
+            return "ERROR: failed to copy AAC channel layout: " + AvErrorToString(result);
+        }
+        encoder->codecContext->sample_fmt =
+            codec->sample_fmts != nullptr ? codec->sample_fmts[0] : AV_SAMPLE_FMT_FLTP;
+
+        result = avcodec_open2(encoder->codecContext, codec, nullptr);
+        if (result < 0) {
+            ReleaseSoftAacEncoderResources(encoder, true);
+            return "ERROR: failed to open AAC encoder: " + AvErrorToString(result);
+        }
+
+        encoder->audioStream->time_base = encoder->codecContext->time_base;
+        result = avcodec_parameters_from_context(encoder->audioStream->codecpar, encoder->codecContext);
+        if (result < 0) {
+            ReleaseSoftAacEncoderResources(encoder, true);
+            return "ERROR: failed to copy AAC codec parameters: " + AvErrorToString(result);
+        }
+
+        result = swr_alloc_set_opts2(
+            &encoder->swrContext,
+            &encoder->codecContext->ch_layout,
+            encoder->codecContext->sample_fmt,
+            encoder->codecContext->sample_rate,
+            &encoder->inputChannelLayout,
+            AV_SAMPLE_FMT_S16,
+            encoder->inputSampleRate,
+            0,
+            nullptr
+        );
+        if (result < 0 || encoder->swrContext == nullptr) {
+            ReleaseSoftAacEncoderResources(encoder, true);
+            return "ERROR: failed to configure AAC resampler: " +
+                AvErrorToString(result < 0 ? result : AVERROR_UNKNOWN);
+        }
+
+        result = swr_init(encoder->swrContext);
+        if (result < 0) {
+            ReleaseSoftAacEncoderResources(encoder, true);
+            return "ERROR: failed to initialize AAC resampler: " + AvErrorToString(result);
+        }
+
+        encoder->audioFifo = av_audio_fifo_alloc(
+            encoder->codecContext->sample_fmt,
+            encoder->codecContext->ch_layout.nb_channels,
+            std::max(encoder->codecContext->frame_size * 4, 4096)
+        );
+        if (encoder->audioFifo == nullptr) {
+            ReleaseSoftAacEncoderResources(encoder, true);
+            return "ERROR: failed to allocate AAC audio fifo.";
+        }
+
+        if (!(encoder->outputContext->oformat->flags & AVFMT_NOFILE)) {
+            result = avio_open(&encoder->outputContext->pb, outputPath.c_str(), AVIO_FLAG_WRITE);
+            if (result < 0) {
+                ReleaseSoftAacEncoderResources(encoder, true);
+                return "ERROR: failed to open AAC output file: " + AvErrorToString(result);
+            }
+        }
+
+        result = avformat_write_header(encoder->outputContext, nullptr);
+        if (result < 0) {
+            ReleaseSoftAacEncoderResources(encoder, true);
+            return "ERROR: failed to write AAC header: " + AvErrorToString(result);
+        }
+
+        encoder->headerWritten = true;
+        encoder->packetCount = 0;
+        encoder->nextPts = 0;
+        return "OK: FFmpeg soft AAC encoder started.";
+    }
+
+    int WriteSoftAacPcm(
+        SoftAacEncoder *encoder,
+        const uint8_t *data,
+        int size
+    ) {
+        if (encoder == nullptr || encoder->codecContext == nullptr || encoder->swrContext == nullptr ||
+            encoder->audioFifo == nullptr || size <= 0 || data == nullptr) {
+            return AVERROR(EINVAL);
+        }
+
+        const int inputBytesPerSample = av_get_bytes_per_sample(AV_SAMPLE_FMT_S16);
+        const int inputFrameBytes = inputBytesPerSample * std::max(encoder->inputChannelCount, 1);
+        if (inputFrameBytes <= 0) {
+            return AVERROR(EINVAL);
+        }
+
+        const int alignedSize = size - (size % inputFrameBytes);
+        if (alignedSize <= 0) {
+            return 0;
+        }
+
+        const int inputSamples = alignedSize / inputFrameBytes;
+        const uint8_t *inputData[1] = {data};
+        const int maxOutputSamples = av_rescale_rnd(
+            swr_get_delay(encoder->swrContext, encoder->inputSampleRate) + inputSamples,
+            encoder->codecContext->sample_rate,
+            encoder->inputSampleRate,
+            AV_ROUND_UP
+        );
+
+        uint8_t **convertedData = nullptr;
+        int result = av_samples_alloc_array_and_samples(
+            &convertedData,
+            nullptr,
+            encoder->codecContext->ch_layout.nb_channels,
+            maxOutputSamples,
+            encoder->codecContext->sample_fmt,
+            0
+        );
+        if (result < 0) {
+            return result;
+        }
+
+        const int convertedSamples = swr_convert(
+            encoder->swrContext,
+            convertedData,
+            maxOutputSamples,
+            inputData,
+            inputSamples
+        );
+        if (convertedSamples < 0) {
+            if (convertedData != nullptr) {
+                av_freep(&convertedData[0]);
+            }
+            av_freep(&convertedData);
+            return convertedSamples;
+        }
+
+        result = av_audio_fifo_realloc(
+            encoder->audioFifo,
+            av_audio_fifo_size(encoder->audioFifo) + convertedSamples
+        );
+        if (result < 0) {
+            if (convertedData != nullptr) {
+                av_freep(&convertedData[0]);
+            }
+            av_freep(&convertedData);
+            return result;
+        }
+
+        result = av_audio_fifo_write(
+            encoder->audioFifo,
+            reinterpret_cast<void **>(convertedData),
+            convertedSamples
+        );
+        if (convertedData != nullptr) {
+            av_freep(&convertedData[0]);
+        }
+        av_freep(&convertedData);
+        if (result < convertedSamples) {
+            return AVERROR(EIO);
+        }
+
+        return EncodeSoftAacFromFifo(encoder, false);
+    }
+
+    std::string CloseSoftAacEncoder(std::unique_ptr<SoftAacEncoder> &encoder) {
+        if (encoder == nullptr) {
+            return "FFmpeg soft AAC encoder was not running.";
+        }
+
+        int result = 0;
+        if (encoder->codecContext != nullptr && encoder->audioFifo != nullptr) {
+            result = EncodeSoftAacFromFifo(encoder.get(), true);
+            if (result < 0) {
+                std::string message = "ERROR: failed to flush remaining AAC samples: " + AvErrorToString(result);
+                ReleaseSoftAacEncoderResources(encoder.get(), true);
+                encoder.reset();
+                return message;
+            }
+
+            result = avcodec_send_frame(encoder->codecContext, nullptr);
+            if (result < 0) {
+                std::string message = "ERROR: failed to signal AAC encoder end of stream: " + AvErrorToString(result);
+                ReleaseSoftAacEncoderResources(encoder.get(), true);
+                encoder.reset();
+                return message;
+            }
+
+            result = ReceiveSoftAacPackets(encoder.get());
+            if (result < 0) {
+                std::string message = "ERROR: failed to drain final AAC packets: " + AvErrorToString(result);
+                ReleaseSoftAacEncoderResources(encoder.get(), true);
+                encoder.reset();
+                return message;
+            }
+        }
+
+        if (encoder->headerWritten && encoder->outputContext != nullptr) {
+            result = av_write_trailer(encoder->outputContext);
+            if (result < 0) {
+                std::string message = "ERROR: failed to finalize AAC output file: " + AvErrorToString(result);
+                ReleaseSoftAacEncoderResources(encoder.get(), true);
+                encoder.reset();
+                return message;
+            }
+        }
+
+        std::ostringstream oss;
+        oss << "FFmpeg soft AAC encode completed.\n"
+            << "packets: " << encoder->packetCount << '\n'
+            << "output: " << encoder->outputPath;
+
+        ReleaseSoftAacEncoderResources(encoder.get(), false);
+        encoder.reset();
+        return oss.str();
+    }
+
     std::string OpenLiveFlvMuxer(
         LiveFlvMuxer *muxer,
         const std::string &outputPath,
@@ -897,6 +1336,86 @@ Java_io_ffmpegtutotial_player_internal_NativeInstance_closeLiveFlvMuxer(
 
     std::lock_guard<std::mutex> lock(holder->liveMuxerMutex);
     std::string result = CloseLiveFlvMuxer(holder->liveMuxer);
+    return env->NewStringUTF(result.c_str());
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_io_ffmpegtutotial_player_internal_NativeInstance_openSoftAacEncoder(
+    JNIEnv *env,
+    jobject obj,
+    jlong nativeHandle,
+    jstring outputPath,
+    jint sampleRate,
+    jint channelCount,
+    jint bitrate,
+    jint profile
+) {
+    auto *holder = reinterpret_cast<InstanceHolder *>(nativeHandle);
+    if (holder == nullptr) {
+        return env->NewStringUTF("ERROR: native instance holder is null.");
+    }
+
+    const char *outputPathChars = env->GetStringUTFChars(outputPath, nullptr);
+    std::lock_guard<std::mutex> lock(holder->softAacEncoderMutex);
+    if (holder->softAacEncoder != nullptr) {
+        CloseSoftAacEncoder(holder->softAacEncoder);
+    }
+    holder->softAacEncoder = std::make_unique<SoftAacEncoder>();
+    std::string result = OpenSoftAacEncoder(
+        holder->softAacEncoder.get(),
+        outputPathChars,
+        sampleRate,
+        channelCount,
+        bitrate,
+        profile
+    );
+    if (result.rfind("OK:", 0) != 0) {
+        holder->softAacEncoder.reset();
+    }
+
+    env->ReleaseStringUTFChars(outputPath, outputPathChars);
+    return env->NewStringUTF(result.c_str());
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_io_ffmpegtutotial_player_internal_NativeInstance_writeSoftAacPcm(
+    JNIEnv *env,
+    jobject obj,
+    jlong nativeHandle,
+    jbyteArray pcmData,
+    jint size
+) {
+    auto *holder = reinterpret_cast<InstanceHolder *>(nativeHandle);
+    if (holder == nullptr) {
+        return AVERROR(EINVAL);
+    }
+
+    std::vector<uint8_t> pcmBytes = JByteArrayToVector(env, pcmData);
+    const int safeSize = std::min(static_cast<int>(pcmBytes.size()), static_cast<int>(size));
+    std::lock_guard<std::mutex> lock(holder->softAacEncoderMutex);
+    return WriteSoftAacPcm(
+        holder->softAacEncoder.get(),
+        pcmBytes.data(),
+        safeSize
+    );
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_io_ffmpegtutotial_player_internal_NativeInstance_closeSoftAacEncoder(
+    JNIEnv *env,
+    jobject obj,
+    jlong nativeHandle
+) {
+    auto *holder = reinterpret_cast<InstanceHolder *>(nativeHandle);
+    if (holder == nullptr) {
+        return env->NewStringUTF("ERROR: native instance holder is null.");
+    }
+
+    std::lock_guard<std::mutex> lock(holder->softAacEncoderMutex);
+    std::string result = CloseSoftAacEncoder(holder->softAacEncoder);
     return env->NewStringUTF(result.c_str());
 }
 
