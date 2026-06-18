@@ -6,6 +6,7 @@ import android.view.LayoutInflater
 import androidx.appcompat.app.AppCompatActivity
 import com.lovelymaple.ffmpegavtutorial.audio.AacEncodeActivity
 import com.lovelymaple.ffmpegavtutorial.audio.AudioCaptureActivity
+import com.lovelymaple.ffmpegavtutorial.basic.CameraInfoActivity
 import com.lovelymaple.ffmpegavtutorial.basic.CameraPreviewActivity
 import com.lovelymaple.ffmpegavtutorial.basic.FFmpegInfoActivity
 import com.lovelymaple.ffmpegavtutorial.basic.H264EncodeActivity
@@ -50,6 +51,9 @@ class MainActivity : AppCompatActivity() {
                     when (val destination = item.destination) {
                         FeatureDestination.FFmpegInfo -> {
                             startActivity(Intent(this, FFmpegInfoActivity::class.java))
+                        }
+                        FeatureDestination.CameraInfo -> {
+                            startActivity(Intent(this, CameraInfoActivity::class.java))
                         }
                         FeatureDestination.CameraPreview -> {
                             startActivity(Intent(this, CameraPreviewActivity::class.java))

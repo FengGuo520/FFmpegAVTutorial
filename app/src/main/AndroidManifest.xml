@@ -15,6 +15,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FFmpegAVTutorial">
         <activity
+            android:name=".basic.CameraInfoActivity"
+            android:exported="false" />
+        <activity
             android:name=".container.RtmpPushActivity"
             android:exported="false" />
         <activity

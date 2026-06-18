@@ -15,6 +15,7 @@ import android.hardware.camera2.CaptureRequest
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
+import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.TextureView
@@ -31,6 +32,11 @@ import kotlin.math.abs
 
 class CameraPreviewActivity : AppCompatActivity() {
 
+    companion object {
+        private const val TAG = "CameraPreviewActivity"
+        const val EXTRA_CAMERA_ID = "extra_camera_id"
+    }
+
     private lateinit var binding: ActivityCameraPreviewBinding
 
     private val cameraManager by lazy { getSystemService(Context.CAMERA_SERVICE) as CameraManager }
@@ -40,15 +46,22 @@ class CameraPreviewActivity : AppCompatActivity() {
     private var previewRequestBuilder: CaptureRequest.Builder? = null
     private var previewSize: Size? = null
     private var currentLensFacing: Int = CameraCharacteristics.LENS_FACING_BACK
+    private var selectedCameraIdOverride: String? = null
+    @Volatile private var isOpeningCamera = false
 
     private var backgroundThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            Log.d(TAG, "permission result granted=$granted textureAvailable=${binding.previewTexture.isAvailable}")
             if (granted) {
                 binding.previewPlaceholder.text = getString(R.string.camera_preview_status_idle)
-                openCameraWhenReady()
+                if (backgroundHandler == null) {
+                    Log.d(TAG, "permission granted but backgroundHandler is null, wait for onResume")
+                } else {
+                    openCameraWhenReady()
+                }
             } else {
                 showPermissionRequiredState(R.string.camera_preview_status_permission_denied)
             }
@@ -56,20 +69,27 @@ class CameraPreviewActivity : AppCompatActivity() {
 
     private val surfaceTextureListener = object : TextureView.SurfaceTextureListener {
         override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
+            Log.d(TAG, "surface available width=$width height=$height")
             openCameraWhenReady()
         }
 
         override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {
+            Log.d(TAG, "surface size changed width=$width height=$height")
             configureTransform(width, height)
         }
 
-        override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean = true
+        override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
+            Log.d(TAG, "surface destroyed")
+            return true
+        }
 
         override fun onSurfaceTextureUpdated(surface: SurfaceTexture) = Unit
     }
 
     private val stateCallback = object : CameraDevice.StateCallback() {
         override fun onOpened(camera: CameraDevice) {
+            Log.d(TAG, "camera onOpened id=${camera.id}")
+            isOpeningCamera = false
             cameraDevice = camera
             runOnUiThread {
                 createCameraPreviewSession()
@@ -77,6 +97,8 @@ class CameraPreviewActivity : AppCompatActivity() {
         }
 
         override fun onDisconnected(camera: CameraDevice) {
+            Log.w(TAG, "camera onDisconnected id=${camera.id}")
+            isOpeningCamera = false
             camera.close()
             cameraDevice = null
             postUiUpdate {
@@ -86,6 +108,8 @@ class CameraPreviewActivity : AppCompatActivity() {
         }
 
         override fun onError(camera: CameraDevice, error: Int) {
+            Log.e(TAG, "camera onError id=${camera.id} error=$error")
+            isOpeningCamera = false
             camera.close()
             cameraDevice = null
             postUiUpdate {
@@ -97,12 +121,20 @@ class CameraPreviewActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d(TAG, "onCreate")
 
         binding = ActivityCameraPreviewBinding.inflate(layoutInflater)
         setContentView(binding.root)
         supportActionBar?.hide()
         setupStatusBarSpace(this, binding.statusBarSpace, lightStatusBarIcons = false)
         setupNavigationBarSpace(binding.navigationBarSpace)
+        selectedCameraIdOverride = intent.getStringExtra(EXTRA_CAMERA_ID)
+        selectedCameraIdOverride?.let { cameraId ->
+            runCatching {
+                cameraManager.getCameraCharacteristics(cameraId)
+                    .get(CameraCharacteristics.LENS_FACING)
+            }.getOrNull()?.let { currentLensFacing = it }
+        }
 
         binding.backButton.setOnClickListener { finish() }
         binding.permissionButton.setOnClickListener { ensureCameraPermissionAndStart() }
@@ -115,6 +147,7 @@ class CameraPreviewActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        Log.d(TAG, "onResume textureAvailable=${binding.previewTexture.isAvailable}")
         startBackgroundThread()
         if (binding.previewTexture.isAvailable) {
             openCameraWhenReady()
@@ -124,12 +157,14 @@ class CameraPreviewActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        Log.d(TAG, "onPause")
         closeCamera()
         stopBackgroundThread()
         super.onPause()
     }
 
     private fun ensureCameraPermissionAndStart() {
+        Log.d(TAG, "ensureCameraPermissionAndStart hasPermission=${hasCameraPermission()}")
         if (hasCameraPermission()) {
             openCameraWhenReady(forceReopen = true)
         } else {
@@ -143,6 +178,14 @@ class CameraPreviewActivity : AppCompatActivity() {
     }
 
     private fun openCameraWhenReady(forceReopen: Boolean = false) {
+        Log.d(
+            TAG,
+            "openCameraWhenReady forceReopen=$forceReopen hasPermission=${hasCameraPermission()} " +
+                "textureAvailable=${binding.previewTexture.isAvailable} cameraDeviceNull=${cameraDevice == null} " +
+                "isOpeningCamera=$isOpeningCamera " +
+                "textureSize=${binding.previewTexture.width}x${binding.previewTexture.height} " +
+                "handlerNull=${backgroundHandler == null}"
+        )
         if (!hasCameraPermission()) {
             showPermissionRequiredState(R.string.camera_preview_status_permission_required)
             return
@@ -158,12 +201,21 @@ class CameraPreviewActivity : AppCompatActivity() {
             updateStatus(getString(R.string.camera_preview_status_previewing, currentLensLabel()))
             return
         }
+        if (isOpeningCamera) {
+            Log.d(TAG, "openCameraWhenReady ignored because camera is already opening")
+            return
+        }
         openCamera()
     }
 
     private fun openCamera() {
         try {
-            val selectedCameraId = findCameraId(currentLensFacing)
+            val selectedCameraId = selectedCameraIdOverride ?: findCameraId(currentLensFacing)
+            Log.d(
+                TAG,
+                "openCamera lensFacing=$currentLensFacing selectedCameraId=$selectedCameraId " +
+                    "selectedCameraIdOverride=$selectedCameraIdOverride"
+            )
             if (selectedCameraId == null) {
                 val message = getString(R.string.camera_preview_status_no_camera, currentLensLabel())
                 updateStatus(message)
@@ -176,6 +228,7 @@ class CameraPreviewActivity : AppCompatActivity() {
             val map =
                 characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
                     ?: run {
+                        Log.e(TAG, "openCamera stream configuration map unavailable for cameraId=$selectedCameraId")
                         updateStatus(getString(R.string.camera_preview_status_error, "preview output unavailable"))
                         return
                     }
@@ -185,6 +238,11 @@ class CameraPreviewActivity : AppCompatActivity() {
                 binding.previewTexture.width,
                 binding.previewTexture.height
             )
+            Log.d(
+                TAG,
+                "openCamera previewSize=${previewSize?.width}x${previewSize?.height} " +
+                    "viewSize=${binding.previewTexture.width}x${binding.previewTexture.height}"
+            )
             configureTransform(binding.previewTexture.width, binding.previewTexture.height)
 
             val openingText = getString(R.string.camera_preview_status_opening, currentLensLabel())
@@ -192,10 +250,16 @@ class CameraPreviewActivity : AppCompatActivity() {
             binding.previewPlaceholder.visibility = View.VISIBLE
             binding.previewPlaceholder.text = openingText
 
+            isOpeningCamera = true
+            Log.d(TAG, "calling cameraManager.openCamera cameraId=$selectedCameraId")
             cameraManager.openCamera(selectedCameraId, stateCallback, backgroundHandler)
         } catch (exception: CameraAccessException) {
+            isOpeningCamera = false
+            Log.e(TAG, "openCamera CameraAccessException", exception)
             updateStatus(getString(R.string.camera_preview_status_error, exception.message ?: "camera access error"))
         } catch (exception: SecurityException) {
+            isOpeningCamera = false
+            Log.e(TAG, "openCamera SecurityException", exception)
             showPermissionRequiredState(R.string.camera_preview_status_permission_required)
         }
     }
@@ -204,10 +268,12 @@ class CameraPreviewActivity : AppCompatActivity() {
         val texture = binding.previewTexture.surfaceTexture ?: return
         val camera = cameraDevice ?: return
         val size = previewSize ?: return
+        Log.d(TAG, "createCameraPreviewSession cameraId=${camera.id} previewSize=${size.width}x${size.height}")
 
         try {
             texture.setDefaultBufferSize(size.width, size.height)
             val surface = Surface(texture)
+            Log.d(TAG, "createCameraPreviewSession surface created")
 
             previewRequestBuilder =
                 camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
@@ -217,11 +283,13 @@ class CameraPreviewActivity : AppCompatActivity() {
                         CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE
                     )
                 }
+            Log.d(TAG, "createCameraPreviewSession request builder prepared")
 
             camera.createCaptureSession(
                 Collections.singletonList(surface),
                 object : CameraCaptureSession.StateCallback() {
                     override fun onConfigured(session: CameraCaptureSession) {
+                        Log.d(TAG, "captureSession onConfigured")
                         if (cameraDevice == null) return
                         cameraCaptureSession = session
                         try {
@@ -230,6 +298,7 @@ class CameraPreviewActivity : AppCompatActivity() {
                                 null,
                                 backgroundHandler
                             )
+                            Log.d(TAG, "captureSession setRepeatingRequest success")
                             postUiUpdate {
                                 binding.previewPlaceholder.visibility = View.GONE
                                 updateStatus(
@@ -240,6 +309,7 @@ class CameraPreviewActivity : AppCompatActivity() {
                                 )
                             }
                         } catch (exception: CameraAccessException) {
+                            Log.e(TAG, "setRepeatingRequest CameraAccessException", exception)
                             postUiUpdate {
                                 updateStatus(
                                     getString(
@@ -252,6 +322,7 @@ class CameraPreviewActivity : AppCompatActivity() {
                     }
 
                     override fun onConfigureFailed(session: CameraCaptureSession) {
+                        Log.e(TAG, "captureSession onConfigureFailed")
                         postUiUpdate {
                             updateStatus(
                                 getString(
@@ -265,21 +336,27 @@ class CameraPreviewActivity : AppCompatActivity() {
                 backgroundHandler
             )
         } catch (exception: CameraAccessException) {
+            isOpeningCamera = false
+            Log.e(TAG, "createCameraPreviewSession CameraAccessException", exception)
             updateStatus(getString(R.string.camera_preview_status_error, exception.message ?: "preview session error"))
         }
     }
 
     private fun switchCamera() {
+        selectedCameraIdOverride = null
         currentLensFacing =
             if (currentLensFacing == CameraCharacteristics.LENS_FACING_BACK) {
                 CameraCharacteristics.LENS_FACING_FRONT
             } else {
                 CameraCharacteristics.LENS_FACING_BACK
             }
+        Log.d(TAG, "switchCamera newLensFacing=$currentLensFacing")
         openCameraWhenReady(forceReopen = true)
     }
 
     private fun closeCamera() {
+        Log.d(TAG, "closeCamera sessionNull=${cameraCaptureSession == null} cameraNull=${cameraDevice == null}")
+        isOpeningCamera = false
         cameraCaptureSession?.close()
         cameraCaptureSession = null
         cameraDevice?.close()
@@ -291,10 +368,12 @@ class CameraPreviewActivity : AppCompatActivity() {
         backgroundThread = HandlerThread("CameraPreviewThread").also { thread ->
             thread.start()
             backgroundHandler = Handler(thread.looper)
+            Log.d(TAG, "startBackgroundThread thread=${thread.name}")
         }
     }
 
     private fun stopBackgroundThread() {
+        Log.d(TAG, "stopBackgroundThread")
         backgroundThread?.quitSafely()
         backgroundThread?.join()
         backgroundThread = null
@@ -326,6 +405,7 @@ class CameraPreviewActivity : AppCompatActivity() {
     }
 
     private fun updateStatus(text: String) {
+        Log.d(TAG, "updateStatus text=$text")
         binding.statusText.text = text
         if (hasCameraPermission()) {
             binding.switchCameraButton.isEnabled = true

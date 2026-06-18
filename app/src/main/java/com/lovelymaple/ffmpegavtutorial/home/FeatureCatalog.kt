@@ -17,6 +17,7 @@ data class FeatureItem(
 
 sealed interface FeatureDestination {
     data object FFmpegInfo : FeatureDestination
+    data object CameraInfo : FeatureDestination
     data object CameraPreview : FeatureDestination
     data object AudioCapture : FeatureDestination
     data object H264Encode : FeatureDestination
@@ -43,6 +44,12 @@ object FeatureCatalog {
         FeatureSection(
             titleRes = R.string.section_basic,
             items = listOf(
+                FeatureItem(
+                    id = "camera_info",
+                    titleRes = R.string.feature_camera_info_title,
+                    summaryRes = R.string.feature_camera_info_summary,
+                    destination = FeatureDestination.CameraInfo
+                ),
                 FeatureItem(
                     id = "camera_preview",
                     titleRes = R.string.feature_camera_preview_title,

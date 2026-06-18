@@ -97,6 +97,16 @@
     <string name="detail_audio_queue_practice">如果你后续要在当前工程里扩展真实音频渲染示例，建议先做 AudioQueue 风格的“基础音频播放页”，确认播放链路稳定后，再升级到更低延迟、更灵活的实现。</string>
     <string name="feature_camera_preview_title">Camera Preview</string>
     <string name="feature_camera_preview_summary">Open the local camera preview, switch front and back lenses, and verify the Stage 1 capture lifecycle.</string>
+    <string name="feature_camera_info_title">Camera Info</string>
+    <string name="feature_camera_info_summary">Inspect the phone camera list, front/back distribution, hardware levels, and basic Camera2 capabilities.</string>
+    <string name="camera_info_page_title">Camera Info</string>
+    <string name="camera_info_badge">Camera Basics</string>
+    <string name="camera_info_headline">Inspect local Camera2 inventory and capabilities</string>
+    <string name="camera_info_subtitle">Browse how many cameras this phone exposes, which ones are front or back, and the basic hardware capabilities each camera reports.</string>
+    <string name="camera_info_description">This device currently exposes %1$d cameras, including %2$d back cameras and %3$d front cameras.</string>
+    <string name="camera_info_refresh">Refresh Camera Info</string>
+    <string name="camera_info_open_preview">Open Preview</string>
+    <string name="camera_info_load_failed">Failed to load camera info: %1$s</string>
     <string name="camera_preview_page_title">Camera Preview</string>
     <string name="camera_preview_badge">Stage 1</string>
     <string name="camera_preview_headline">Local camera preview with Camera2</string>
