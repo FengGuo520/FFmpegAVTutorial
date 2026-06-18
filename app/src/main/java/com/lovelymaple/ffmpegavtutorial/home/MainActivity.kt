@@ -10,6 +10,7 @@ import com.lovelymaple.ffmpegavtutorial.basic.CameraInfoActivity
 import com.lovelymaple.ffmpegavtutorial.basic.CameraPreviewActivity
 import com.lovelymaple.ffmpegavtutorial.basic.FFmpegInfoActivity
 import com.lovelymaple.ffmpegavtutorial.basic.H264EncodeActivity
+import com.lovelymaple.ffmpegavtutorial.basic.H264StreamAnalyzerActivity
 import com.lovelymaple.ffmpegavtutorial.container.FlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.LiveFlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.RtmpPushActivity
@@ -60,6 +61,9 @@ class MainActivity : AppCompatActivity() {
                         }
                         FeatureDestination.AudioCapture -> {
                             startActivity(Intent(this, AudioCaptureActivity::class.java))
+                        }
+                        FeatureDestination.H264StreamAnalyzer -> {
+                            startActivity(Intent(this, H264StreamAnalyzerActivity::class.java))
                         }
                         FeatureDestination.AacEncode -> {
                             startActivity(Intent(this, AacEncodeActivity::class.java))

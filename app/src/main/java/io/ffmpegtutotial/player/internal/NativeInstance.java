@@ -24,6 +24,8 @@ public class NativeInstance {
 
     public native String getInfo(long nativePtr);
 
+    public native String analyzeH264Stream(long nativePtr, String filePath);
+
     public native String muxToFlv(long nativePtr, String videoPath, String audioPath, String outputPath);
 
     public native String openLiveFlvMuxer(
@@ -66,6 +68,10 @@ public class NativeInstance {
 
     public String getInfo() {
         return getInfo(nativePtr);
+    }
+
+    public String analyzeH264Stream(String filePath) {
+        return analyzeH264Stream(nativePtr, filePath);
     }
 
     public String muxToFlv(String videoPath, String audioPath, String outputPath) {

@@ -19,6 +19,7 @@ sealed interface FeatureDestination {
     data object FFmpegInfo : FeatureDestination
     data object CameraInfo : FeatureDestination
     data object CameraPreview : FeatureDestination
+    data object H264StreamAnalyzer : FeatureDestination
     data object AudioCapture : FeatureDestination
     data object H264Encode : FeatureDestination
     data object AacEncode : FeatureDestination
@@ -85,6 +86,12 @@ object FeatureCatalog {
                     titleRes = R.string.feature_h264_encode_title,
                     summaryRes = R.string.feature_h264_encode_summary,
                     destination = FeatureDestination.H264Encode
+                ),
+                FeatureItem(
+                    id = "h264_stream_analyzer",
+                    titleRes = R.string.feature_h264_analyzer_title,
+                    summaryRes = R.string.feature_h264_analyzer_summary,
+                    destination = FeatureDestination.H264StreamAnalyzer
                 ),
                 FeatureItem(
                     id = "decode_packet",

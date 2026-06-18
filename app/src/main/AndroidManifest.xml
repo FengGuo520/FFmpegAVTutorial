@@ -30,6 +30,9 @@
             android:name=".audio.AacEncodeActivity"
             android:exported="false" />
         <activity
+            android:name=".basic.H264StreamAnalyzerActivity"
+            android:exported="false" />
+        <activity
             android:name=".basic.H264EncodeActivity"
             android:exported="false" />
         <activity

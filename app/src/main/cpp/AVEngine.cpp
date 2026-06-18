@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cstring>
 #include <cstdio>
+#include <fstream>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -258,6 +260,370 @@ namespace {
             return INT64_MAX;
         }
         return av_rescale_q(timestamp, NormalizeTimeBase(timeBase, AVRational{1, 1000}), AV_TIME_BASE_Q);
+    }
+
+    const char *H264NalUnitTypeName(int nalUnitType) {
+        switch (nalUnitType) {
+            case 1:
+                return "non_idr_slice";
+            case 2:
+                return "slice_data_a";
+            case 3:
+                return "slice_data_b";
+            case 4:
+                return "slice_data_c";
+            case 5:
+                return "idr_slice";
+            case 6:
+                return "sei";
+            case 7:
+                return "sps";
+            case 8:
+                return "pps";
+            case 9:
+                return "aud";
+            case 10:
+                return "end_of_sequence";
+            case 11:
+                return "end_of_stream";
+            case 12:
+                return "filler";
+            case 13:
+                return "sps_extension";
+            case 14:
+                return "prefix_nal";
+            case 15:
+                return "subset_sps";
+            case 19:
+                return "auxiliary_slice";
+            default:
+                return "other";
+        }
+    }
+
+    std::string H264ProfileToString(int profile) {
+        if (profile == FF_PROFILE_UNKNOWN) {
+            return "unknown";
+        }
+        const char *profileName = avcodec_profile_name(AV_CODEC_ID_H264, profile);
+        if (profileName != nullptr) {
+            return profileName;
+        }
+        return std::to_string(profile);
+    }
+
+    std::string H264LevelToString(int level) {
+        if (level <= 0) {
+            return "unknown";
+        }
+        std::ostringstream oss;
+        oss << (level / 10);
+        if (level % 10 != 0) {
+            oss << '.' << (level % 10);
+        } else {
+            oss << ".0";
+        }
+        return oss.str();
+    }
+
+    std::string RationalToString(AVRational rational) {
+        if (rational.num <= 0 || rational.den <= 0) {
+            return "unknown";
+        }
+        std::ostringstream oss;
+        oss << rational.num << '/' << rational.den;
+        return oss.str();
+    }
+
+    bool FindNextStartCode(
+        const std::vector<uint8_t> &data,
+        size_t fromOffset,
+        size_t &startOffset,
+        size_t &startCodeLength
+    ) {
+        if (data.size() < 4 || fromOffset >= data.size()) {
+            return false;
+        }
+
+        for (size_t i = fromOffset; i + 3 < data.size(); ++i) {
+            if (data[i] == 0 && data[i + 1] == 0) {
+                if (data[i + 2] == 1) {
+                    startOffset = i;
+                    startCodeLength = 3;
+                    return true;
+                }
+                if (i + 3 < data.size() && data[i + 2] == 0 && data[i + 3] == 1) {
+                    startOffset = i;
+                    startCodeLength = 4;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    int CountH264AccessUnits(const std::vector<uint8_t> &fileBytes, std::string &errorMessage) {
+        const AVCodec *codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+        if (codec == nullptr) {
+            errorMessage = "H.264 decoder/parser is not available in this build.";
+            return -1;
+        }
+
+        AVCodecParserContext *parser = av_parser_init(AV_CODEC_ID_H264);
+        if (parser == nullptr) {
+            errorMessage = "failed to create H.264 parser.";
+            return -1;
+        }
+
+        AVCodecContext *codecContext = avcodec_alloc_context3(codec);
+        if (codecContext == nullptr) {
+            av_parser_close(parser);
+            errorMessage = "failed to allocate H.264 parser context.";
+            return -1;
+        }
+
+        int accessUnitCount = 0;
+        size_t offset = 0;
+        while (offset < fileBytes.size()) {
+            uint8_t *parsedData = nullptr;
+            int parsedSize = 0;
+            const int chunkSize = static_cast<int>(std::min<size_t>(fileBytes.size() - offset, 4096));
+            int consumed = av_parser_parse2(
+                parser,
+                codecContext,
+                &parsedData,
+                &parsedSize,
+                fileBytes.data() + offset,
+                chunkSize,
+                AV_NOPTS_VALUE,
+                AV_NOPTS_VALUE,
+                0
+            );
+            if (consumed < 0) {
+                errorMessage = "failed while parsing H.264 access units: " + AvErrorToString(consumed);
+                avcodec_free_context(&codecContext);
+                av_parser_close(parser);
+                return -1;
+            }
+            if (parsedSize > 0) {
+                accessUnitCount += 1;
+            }
+            if (consumed == 0) {
+                break;
+            }
+            offset += static_cast<size_t>(consumed);
+        }
+
+        uint8_t *flushData = nullptr;
+        int flushSize = 0;
+        int flushResult = av_parser_parse2(
+            parser,
+            codecContext,
+            &flushData,
+            &flushSize,
+            nullptr,
+            0,
+            AV_NOPTS_VALUE,
+            AV_NOPTS_VALUE,
+            0
+        );
+        if (flushResult < 0) {
+            errorMessage = "failed while flushing H.264 parser: " + AvErrorToString(flushResult);
+            avcodec_free_context(&codecContext);
+            av_parser_close(parser);
+            return -1;
+        }
+        if (flushSize > 0) {
+            accessUnitCount += 1;
+        }
+
+        avcodec_free_context(&codecContext);
+        av_parser_close(parser);
+        return accessUnitCount;
+    }
+
+    std::string AnalyzeH264Stream(const std::string &filePath) {
+        std::ifstream input(filePath, std::ios::binary);
+        if (!input.is_open()) {
+            return "ERROR: failed to open H.264 file: " + filePath;
+        }
+
+        std::vector<uint8_t> fileBytes(
+            (std::istreambuf_iterator<char>(input)),
+            std::istreambuf_iterator<char>()
+        );
+        input.close();
+
+        if (fileBytes.empty()) {
+            return "ERROR: selected H.264 file is empty.";
+        }
+
+        AVFormatContext *formatContext = nullptr;
+        AVDictionary *formatOptions = nullptr;
+        int result = 0;
+
+        av_dict_set(&formatOptions, "framerate", "30", 0);
+        result = avformat_open_input(
+            &formatContext,
+            filePath.c_str(),
+            av_find_input_format("h264"),
+            &formatOptions
+        );
+        av_dict_free(&formatOptions);
+        if (result < 0 || formatContext == nullptr) {
+            if (formatContext != nullptr) {
+                avformat_close_input(&formatContext);
+            }
+            return "ERROR: failed to open H.264 stream with FFmpeg: " + AvErrorToString(result);
+        }
+
+        result = avformat_find_stream_info(formatContext, nullptr);
+        if (result < 0) {
+            avformat_close_input(&formatContext);
+            return "ERROR: failed to read H.264 stream info: " + AvErrorToString(result);
+        }
+
+        int videoStreamIndex = FindFirstStreamIndex(formatContext, AVMEDIA_TYPE_VIDEO);
+        if (videoStreamIndex < 0) {
+            avformat_close_input(&formatContext);
+            return "ERROR: no video stream found in H.264 file.";
+        }
+
+        AVStream *videoStream = formatContext->streams[videoStreamIndex];
+        AVCodecParameters *codecParameters = videoStream->codecpar;
+
+        std::map<int, int> nalTypeCounts;
+        int nalUnitCount = 0;
+        int spsCount = 0;
+        int ppsCount = 0;
+        int seiCount = 0;
+        int audCount = 0;
+        int idrCount = 0;
+        int nonIdrCount = 0;
+
+        constexpr int kMaxDetailedNalUnits = 300;
+        std::vector<std::string> nalDetails;
+        nalDetails.reserve(std::min<size_t>(kMaxDetailedNalUnits, fileBytes.size() / 32 + 1));
+
+        size_t currentStart = 0;
+        size_t currentStartCodeLength = 0;
+        bool hasCurrent = FindNextStartCode(fileBytes, 0, currentStart, currentStartCodeLength);
+        if (!hasCurrent) {
+            avformat_close_input(&formatContext);
+            return "ERROR: no Annex B start code was found in the selected H.264 file.";
+        }
+
+        while (hasCurrent) {
+            size_t nextStart = 0;
+            size_t nextStartCodeLength = 0;
+            bool hasNext = FindNextStartCode(
+                fileBytes,
+                currentStart + currentStartCodeLength,
+                nextStart,
+                nextStartCodeLength
+            );
+
+            const size_t payloadOffset = currentStart + currentStartCodeLength;
+            const size_t payloadEnd = hasNext ? nextStart : fileBytes.size();
+            if (payloadOffset < payloadEnd) {
+                const size_t payloadSize = payloadEnd - payloadOffset;
+                const uint8_t nalHeader = fileBytes[payloadOffset];
+                const int nalRefIdc = (nalHeader >> 5) & 0x03;
+                const int nalUnitType = nalHeader & 0x1F;
+
+                nalUnitCount += 1;
+                nalTypeCounts[nalUnitType] += 1;
+
+                if (nalUnitType == 7) {
+                    spsCount += 1;
+                } else if (nalUnitType == 8) {
+                    ppsCount += 1;
+                } else if (nalUnitType == 6) {
+                    seiCount += 1;
+                } else if (nalUnitType == 9) {
+                    audCount += 1;
+                } else if (nalUnitType == 5) {
+                    idrCount += 1;
+                } else if (nalUnitType == 1) {
+                    nonIdrCount += 1;
+                }
+
+                if (static_cast<int>(nalDetails.size()) < kMaxDetailedNalUnits) {
+                    std::ostringstream line;
+                    line << "  #" << nalUnitCount
+                         << " offset=" << payloadOffset
+                         << " start_code_bytes=" << currentStartCodeLength
+                         << " payload_bytes=" << payloadSize
+                         << " type=" << nalUnitType
+                         << " (" << H264NalUnitTypeName(nalUnitType) << ')'
+                         << " nal_ref_idc=" << nalRefIdc;
+                    nalDetails.push_back(line.str());
+                }
+            }
+
+            currentStart = nextStart;
+            currentStartCodeLength = nextStartCodeLength;
+            hasCurrent = hasNext;
+        }
+
+        std::string accessUnitError;
+        int accessUnitCount = CountH264AccessUnits(fileBytes, accessUnitError);
+
+        std::ostringstream oss;
+        oss << "H264 Stream Analysis\n"
+            << "====================\n\n";
+
+        oss << "summary:\n"
+            << "  file_path: " << filePath << '\n'
+            << "  file_size_bytes: " << fileBytes.size() << '\n'
+            << "  codec_id: " << avcodec_get_name(codecParameters->codec_id) << '\n'
+            << "  width: " << codecParameters->width << '\n'
+            << "  height: " << codecParameters->height << '\n'
+            << "  profile: " << H264ProfileToString(codecParameters->profile) << '\n'
+            << "  level: " << H264LevelToString(codecParameters->level) << '\n'
+            << "  nal_unit_count: " << nalUnitCount << '\n'
+            << "  sps_count: " << spsCount << '\n'
+            << "  pps_count: " << ppsCount << '\n'
+            << "  sei_count: " << seiCount << '\n'
+            << "  aud_count: " << audCount << '\n'
+            << "  idr_count: " << idrCount << '\n'
+            << "  non_idr_count: " << nonIdrCount << '\n';
+        if (accessUnitCount >= 0) {
+            oss << "  access_unit_count: " << accessUnitCount << '\n';
+        } else {
+            oss << "  access_unit_count: unknown\n";
+        }
+
+        oss << "\nstream_info:\n"
+            << "  stream_index: " << videoStreamIndex << '\n'
+            << "  time_base: " << RationalToString(videoStream->time_base) << '\n'
+            << "  avg_frame_rate: " << RationalToString(videoStream->avg_frame_rate) << '\n'
+            << "  r_frame_rate: " << RationalToString(videoStream->r_frame_rate) << '\n'
+            << "  extradata_size: " << codecParameters->extradata_size << '\n'
+            << "  bit_rate: " << codecParameters->bit_rate << '\n';
+
+        if (!accessUnitError.empty()) {
+            oss << "  parser_note: " << accessUnitError << '\n';
+        }
+
+        oss << "\nnal_type_counts:\n";
+        for (const auto &entry : nalTypeCounts) {
+            oss << "  type " << entry.first
+                << " (" << H264NalUnitTypeName(entry.first) << "): "
+                << entry.second << '\n';
+        }
+
+        oss << "\nnal_units:\n";
+        for (const auto &detail : nalDetails) {
+            oss << detail << '\n';
+        }
+        if (nalUnitCount > static_cast<int>(nalDetails.size())) {
+            oss << "  ... truncated, showing first " << nalDetails.size()
+                << " of " << nalUnitCount << " NAL units.\n";
+        }
+
+        avformat_close_input(&formatContext);
+        return oss.str();
     }
 
     struct PacketSource {
@@ -1188,6 +1554,24 @@ JNIEXPORT jstring JNICALL
 Java_io_ffmpegtutotial_player_internal_NativeInstance_getInfo(JNIEnv *env, jobject obj,jlong nativeHandle) {
     std::string info = BuildFFmpegInfo();
     return env->NewStringUTF(info.c_str());
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_io_ffmpegtutotial_player_internal_NativeInstance_analyzeH264Stream(
+    JNIEnv *env,
+    jobject obj,
+    jlong nativeHandle,
+    jstring filePath
+) {
+    if (filePath == nullptr) {
+        return env->NewStringUTF("ERROR: file path is null.");
+    }
+
+    const char *filePathChars = env->GetStringUTFChars(filePath, nullptr);
+    std::string result = AnalyzeH264Stream(filePathChars);
+    env->ReleaseStringUTFChars(filePath, filePathChars);
+    return env->NewStringUTF(result.c_str());
 }
 
 extern "C"

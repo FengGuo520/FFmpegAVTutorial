@@ -101,6 +101,213 @@
                         android:textColor="#475569"
                         android:textSize="14sp" />
 
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="18dp"
+                        android:text="@string/h264_encode_output_group_title"
+                        android:textColor="#0F172A"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="@string/h264_encode_output_group_summary"
+                        android:textColor="#475569"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:text="@string/h264_encode_resolution_title"
+                        android:textColor="#0F172A"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <RadioGroup
+                        android:id="@+id/resolution_group"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:checkedButton="@id/resolution_720_radio"
+                        android:orientation="horizontal">
+
+                        <RadioButton
+                            android:id="@+id/resolution_540_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/h264_encode_resolution_540p" />
+
+                        <RadioButton
+                            android:id="@+id/resolution_720_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="@string/h264_encode_resolution_720p" />
+
+                        <RadioButton
+                            android:id="@+id/resolution_1080_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="@string/h264_encode_resolution_1080p" />
+                    </RadioGroup>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/h264_encode_bitrate_title"
+                        android:textColor="#0F172A"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <RadioGroup
+                        android:id="@+id/bitrate_group"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:checkedButton="@id/bitrate_2m_radio"
+                        android:orientation="horizontal">
+
+                        <RadioButton
+                            android:id="@+id/bitrate_1m_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/h264_encode_bitrate_1m" />
+
+                        <RadioButton
+                            android:id="@+id/bitrate_2m_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="@string/h264_encode_bitrate_2m" />
+
+                        <RadioButton
+                            android:id="@+id/bitrate_4m_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="@string/h264_encode_bitrate_4m" />
+                    </RadioGroup>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/h264_encode_profile_title"
+                        android:textColor="#0F172A"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <RadioGroup
+                        android:id="@+id/profile_group"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:checkedButton="@id/profile_baseline_radio"
+                        android:orientation="horizontal">
+
+                        <RadioButton
+                            android:id="@+id/profile_baseline_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/h264_encode_profile_baseline" />
+
+                        <RadioButton
+                            android:id="@+id/profile_main_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="@string/h264_encode_profile_main" />
+
+                        <RadioButton
+                            android:id="@+id/profile_high_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="@string/h264_encode_profile_high" />
+                    </RadioGroup>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/h264_encode_level_title"
+                        android:textColor="#0F172A"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <RadioGroup
+                        android:id="@+id/level_group"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:checkedButton="@id/level_31_radio"
+                        android:orientation="horizontal">
+
+                        <RadioButton
+                            android:id="@+id/level_31_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/h264_encode_level_31" />
+
+                        <RadioButton
+                            android:id="@+id/level_40_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="@string/h264_encode_level_40" />
+
+                        <RadioButton
+                            android:id="@+id/level_41_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="@string/h264_encode_level_41" />
+                    </RadioGroup>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/h264_encode_iframe_title"
+                        android:textColor="#0F172A"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <RadioGroup
+                        android:id="@+id/iframe_group"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:checkedButton="@id/iframe_2_radio"
+                        android:orientation="horizontal">
+
+                        <RadioButton
+                            android:id="@+id/iframe_1_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/h264_encode_iframe_1s" />
+
+                        <RadioButton
+                            android:id="@+id/iframe_2_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="@string/h264_encode_iframe_2s" />
+
+                        <RadioButton
+                            android:id="@+id/iframe_5_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="@string/h264_encode_iframe_5s" />
+                    </RadioGroup>
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -243,6 +450,33 @@
                         tools:text="Bitrate: 2000000 bps" />
 
                     <TextView
+                        android:id="@+id/profile_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="#334155"
+                        android:textSize="14sp"
+                        tools:text="Profile: Baseline" />
+
+                    <TextView
+                        android:id="@+id/level_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="#334155"
+                        android:textSize="14sp"
+                        tools:text="Level: 3.1" />
+
+                    <TextView
+                        android:id="@+id/iframe_interval_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="#334155"
+                        android:textSize="14sp"
+                        tools:text="I-frame interval: 2 s" />
+
+                    <TextView
                         android:id="@+id/frame_count_text"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -259,6 +493,37 @@
                         android:textColor="#334155"
                         android:textSize="14sp"
                         tools:text="H264 file: /data/user/0/.../video_20260616_210000.h264" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:text="@string/h264_encode_probe_title"
+                        android:textColor="#0F172A"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/open_full_analyzer_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:enabled="false"
+                        android:text="@string/h264_encode_probe_open_full_analyzer" />
+
+                    <TextView
+                        android:id="@+id/probe_info_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:background="#F8FAFC"
+                        android:padding="14dp"
+                        android:text="@string/h264_encode_probe_empty"
+                        android:textColor="#334155"
+                        android:textIsSelectable="true"
+                        android:textSize="13sp"
+                        android:typeface="monospace"
+                        tools:text="Output probe info will appear here after encoding stops." />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
