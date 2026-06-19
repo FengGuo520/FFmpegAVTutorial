@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -12,16 +15,40 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FFmpegAVTutorial">
         <activity
-            android:name=".FeatureDetailActivity"
+            android:name=".basic.CameraInfoActivity"
             android:exported="false" />
         <activity
-            android:name=".DeviceCodecInfoActivity"
+            android:name=".container.RtmpPushActivity"
             android:exported="false" />
         <activity
-            android:name=".FFmpegInfoActivity"
+            android:name=".container.LiveFlvMuxActivity"
             android:exported="false" />
         <activity
-            android:name=".MainActivity"
+            android:name=".container.FlvMuxActivity"
+            android:exported="false" />
+        <activity
+            android:name=".audio.AacEncodeActivity"
+            android:exported="false" />
+        <activity
+            android:name=".basic.H264StreamAnalyzerActivity"
+            android:exported="false" />
+        <activity
+            android:name=".basic.H264EncodeActivity"
+            android:exported="false" />
+        <activity
+            android:name=".audio.AudioCaptureActivity"
+            android:exported="false" />
+        <activity
+            android:name=".basic.CameraPreviewActivity"
+            android:exported="false" />
+        <activity
+            android:name=".home.FeatureDetailActivity"
+            android:exported="false" />
+        <activity
+            android:name=".basic.FFmpegInfoActivity"
+            android:exported="false" />
+        <activity
+            android:name=".home.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
