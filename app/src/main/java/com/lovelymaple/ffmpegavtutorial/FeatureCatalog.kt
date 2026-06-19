@@ -16,6 +16,7 @@ data class FeatureItem(
 
 sealed interface FeatureDestination {
     data object FFmpegInfo : FeatureDestination
+    data object DeviceCodecInfo : FeatureDestination
     data class Detail(val featureId: String) : FeatureDestination
 }
 
@@ -40,6 +41,12 @@ object FeatureCatalog {
                     titleRes = R.string.feature_opengl_version_title,
                     summaryRes = R.string.feature_opengl_version_summary,
                     destination = FeatureDestination.FFmpegInfo
+                ),
+                FeatureItem(
+                    id = "device_codec_info",
+                    titleRes = R.string.feature_device_codec_info_title,
+                    summaryRes = R.string.feature_device_codec_info_summary,
+                    destination = FeatureDestination.DeviceCodecInfo
                 ),
                 FeatureItem(
                     id = "custom_thread",

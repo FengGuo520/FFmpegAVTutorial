@@ -10,6 +10,8 @@
 
     <string name="feature_opengl_version_title">OpenGL Version</string>
     <string name="feature_opengl_version_summary">FFmpeg 编译配置和版本信息；OpenGL 信息</string>
+    <string name="feature_device_codec_info_title">Device Codec Info</string>
+    <string name="feature_device_codec_info_summary">显示当前手机 MediaCodec 音视频编解码能力</string>
     <string name="feature_custom_thread_title">Custom Thread</string>
     <string name="feature_custom_thread_summary">封装线程能力，方便后续调度解码和渲染任务</string>
     <string name="feature_movie_prober_title">Movie Prober</string>
@@ -42,6 +44,10 @@
     <string name="refresh_ffmpeg_info">刷新信息</string>
     <string name="loading_ffmpeg_info">正在读取 FFmpeg 运行时信息...</string>
     <string name="ffmpeg_info_load_failed">读取 FFmpeg 信息失败：%1$s</string>
+    <string name="device_codec_info_page_title">Device Codec Info</string>
+    <string name="device_codec_info_badge">MediaCodecList</string>
+    <string name="device_codec_info_title">Current Device Codec Capabilities</string>
+    <string name="device_codec_info_subtitle">通过 Android MediaCodecList 枚举当前手机的音频、视频、编码器和解码器能力。</string>
 
     <string name="detail_overview_title">功能概览</string>
     <string name="detail_focus_title">学习重点</string>

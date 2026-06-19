@@ -15,6 +15,9 @@
             android:name=".FeatureDetailActivity"
             android:exported="false" />
         <activity
+            android:name=".DeviceCodecInfoActivity"
+            android:exported="false" />
+        <activity
             android:name=".FFmpegInfoActivity"
             android:exported="false" />
         <activity

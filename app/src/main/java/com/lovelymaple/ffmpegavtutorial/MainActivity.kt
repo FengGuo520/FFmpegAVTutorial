@@ -40,6 +40,9 @@ class MainActivity : AppCompatActivity() {
                         FeatureDestination.FFmpegInfo -> {
                             startActivity(Intent(this, FFmpegInfoActivity::class.java))
                         }
+                        FeatureDestination.DeviceCodecInfo -> {
+                            startActivity(Intent(this, DeviceCodecInfoActivity::class.java))
+                        }
                         is FeatureDestination.Detail -> {
                             startActivity(
                                 Intent(this, FeatureDetailActivity::class.java)
