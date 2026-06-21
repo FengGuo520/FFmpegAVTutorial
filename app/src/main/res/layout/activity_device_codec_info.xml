@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="#F4F7FB"
     android:orientation="vertical"
-    tools:context=".DeviceCodecInfoActivity">
+    tools:context=".basic.DeviceCodecInfoActivity">
 
     <View
         android:id="@+id/status_bar_space"

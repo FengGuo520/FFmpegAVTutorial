@@ -33,6 +33,7 @@
             android:textSize="26sp" />
 
         <TextView
+            android:id="@+id/page_title_text"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
@@ -70,6 +71,7 @@
                     android:padding="20dp">
 
                     <TextView
+                        android:id="@+id/badge_text"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:background="#EEF4FF"
@@ -83,6 +85,7 @@
                         android:textStyle="bold" />
 
                     <TextView
+                        android:id="@+id/headline_text"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="14dp"

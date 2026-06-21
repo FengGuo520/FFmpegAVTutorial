@@ -14,7 +14,9 @@ import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
+import android.media.MediaCodecList
 import android.media.MediaFormat
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
@@ -23,11 +25,12 @@ import android.util.Size
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
+import android.widget.RadioButton
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.lovelymaple.ffmpegavtutorial.R
-import com.lovelymaple.ffmpegavtutorial.databinding.ActivityH264EncodeBinding
+import com.lovelymaple.ffmpegavtutorial.databinding.ActivityVideoEncodeBinding
 import com.lovelymaple.ffmpegavtutorial.ui.setupNavigationBarSpace
 import com.lovelymaple.ffmpegavtutorial.ui.setupStatusBarSpace
 import io.ffmpegtutotial.player.internal.NativeInstance
@@ -41,10 +44,10 @@ import java.util.Locale
 import kotlin.concurrent.thread
 import kotlin.math.abs
 
-class H264EncodeActivity : AppCompatActivity() {
+class VideoEncodeActivity : AppCompatActivity() {
 
     companion object {
-        private const val TAG = "H264EncodeActivity"
+        private const val TAG = "VideoEncodeActivity"
     }
 
     private enum class ResolutionOption(
@@ -66,22 +69,24 @@ class H264EncodeActivity : AppCompatActivity() {
         BR_4M(4_000_000, R.string.h264_encode_bitrate_4m)
     }
 
-    private enum class H264LevelOption(
-        val level: Int,
-        val labelRes: Int
+    private enum class VideoCodecOption(
+        val mimeType: String,
+        val labelRes: Int,
+        val fileTag: String,
+        val fileExtension: String
     ) {
-        LEVEL_3_1(MediaCodecInfo.CodecProfileLevel.AVCLevel31, R.string.h264_encode_level_31),
-        LEVEL_4_0(MediaCodecInfo.CodecProfileLevel.AVCLevel4, R.string.h264_encode_level_40),
-        LEVEL_4_1(MediaCodecInfo.CodecProfileLevel.AVCLevel41, R.string.h264_encode_level_41)
-    }
-
-    private enum class H264ProfileOption(
-        val profile: Int,
-        val labelRes: Int
-    ) {
-        BASELINE(MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline, R.string.h264_encode_profile_baseline),
-        MAIN(MediaCodecInfo.CodecProfileLevel.AVCProfileMain, R.string.h264_encode_profile_main),
-        HIGH(MediaCodecInfo.CodecProfileLevel.AVCProfileHigh, R.string.h264_encode_profile_high)
+        H264(
+            MediaFormat.MIMETYPE_VIDEO_AVC,
+            R.string.h264_encode_codec_h264,
+            "h264",
+            "h264"
+        ),
+        H265(
+            MediaFormat.MIMETYPE_VIDEO_HEVC,
+            R.string.h264_encode_codec_h265,
+            "h265",
+            "h265"
+        )
     }
 
     private enum class IFrameIntervalOption(
@@ -93,7 +98,7 @@ class H264EncodeActivity : AppCompatActivity() {
         SEC_5(5, R.string.h264_encode_iframe_5s)
     }
 
-    private lateinit var binding: ActivityH264EncodeBinding
+    private lateinit var binding: ActivityVideoEncodeBinding
     private lateinit var nativeInstance: NativeInstance
 
     private val cameraManager by lazy { getSystemService(Context.CAMERA_SERVICE) as CameraManager }
@@ -105,6 +110,7 @@ class H264EncodeActivity : AppCompatActivity() {
     private var previewRequestBuilder: CaptureRequest.Builder? = null
     private var previewSize: Size? = null
     private var currentLensFacing: Int = CameraCharacteristics.LENS_FACING_BACK
+    @Volatile private var isOpeningCamera = false
 
     private var backgroundThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
@@ -117,17 +123,29 @@ class H264EncodeActivity : AppCompatActivity() {
     @Volatile private var encodedFrameCount = 0
     private var drainThread: Thread? = null
     private var latestAnalyzableFile: File? = null
+    private var latestAnalyzableCodec: VideoCodecOption? = null
+    private var currentCodec = VideoCodecOption.H264
     private var currentResolution = ResolutionOption.P720
     private var currentBitrate = BitrateOption.BR_2M
-    private var currentProfile = H264ProfileOption.BASELINE
-    private var currentLevel = H264LevelOption.LEVEL_3_1
+    private var currentAvcProfile: Int? = null
+    private var currentAvcLevel: Int? = null
+    private var currentHevcProfile: Int? = null
+    private var currentHevcLevel: Int? = null
     private var currentIFrameInterval = IFrameIntervalOption.SEC_2
+    private val profileRadioValues = mutableMapOf<Int, Int>()
+    private val levelRadioValues = mutableMapOf<Int, Int>()
+    private var suppressProfileLevelCallbacks = false
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            Log.d(TAG, "permission result granted=$granted textureAvailable=${binding.previewTexture.isAvailable}")
             if (granted) {
                 updatePermissionUi()
-                openCameraWhenReady()
+                if (backgroundHandler == null) {
+                    Log.d(TAG, "permission granted but backgroundHandler is null, wait for onResume")
+                } else {
+                    openCameraWhenReady()
+                }
             } else {
                 showPermissionRequiredState(R.string.h264_encode_status_permission_denied)
             }
@@ -135,20 +153,27 @@ class H264EncodeActivity : AppCompatActivity() {
 
     private val surfaceTextureListener = object : TextureView.SurfaceTextureListener {
         override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
+            Log.d(TAG, "surface available width=$width height=$height")
             openCameraWhenReady()
         }
 
         override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {
+            Log.d(TAG, "surface size changed width=$width height=$height")
             configureTransform(width, height)
         }
 
-        override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean = true
+        override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
+            Log.d(TAG, "surface destroyed")
+            return true
+        }
 
         override fun onSurfaceTextureUpdated(surface: SurfaceTexture) = Unit
     }
 
     private val stateCallback = object : CameraDevice.StateCallback() {
         override fun onOpened(camera: CameraDevice) {
+            Log.d(TAG, "camera onOpened id=${camera.id}")
+            isOpeningCamera = false
             cameraDevice = camera
             postUi {
                 createCameraSession()
@@ -156,6 +181,8 @@ class H264EncodeActivity : AppCompatActivity() {
         }
 
         override fun onDisconnected(camera: CameraDevice) {
+            Log.w(TAG, "camera onDisconnected id=${camera.id}")
+            isOpeningCamera = false
             camera.close()
             cameraDevice = null
             postUi {
@@ -165,6 +192,8 @@ class H264EncodeActivity : AppCompatActivity() {
         }
 
         override fun onError(camera: CameraDevice, error: Int) {
+            Log.e(TAG, "camera onError id=${camera.id} error=$error")
+            isOpeningCamera = false
             camera.close()
             cameraDevice = null
             postUi {
@@ -176,8 +205,9 @@ class H264EncodeActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d(TAG, "onCreate")
 
-        binding = ActivityH264EncodeBinding.inflate(layoutInflater)
+        binding = ActivityVideoEncodeBinding.inflate(layoutInflater)
         setContentView(binding.root)
         supportActionBar?.hide()
         setupStatusBarSpace(this, binding.statusBarSpace, lightStatusBarIcons = false)
@@ -191,6 +221,15 @@ class H264EncodeActivity : AppCompatActivity() {
         binding.stopButton.setOnClickListener { stopEncoding() }
         binding.openFullAnalyzerButton.setOnClickListener { openFullAnalyzer() }
         binding.previewTexture.surfaceTextureListener = surfaceTextureListener
+        binding.codecGroup.setOnCheckedChangeListener { _, checkedId ->
+            currentCodec =
+                when (checkedId) {
+                    binding.codecH265Radio.id -> VideoCodecOption.H265
+                    else -> VideoCodecOption.H264
+                }
+            rebuildProfileLevelControls()
+            updateStaticInfo()
+        }
         binding.resolutionGroup.setOnCheckedChangeListener { _, checkedId ->
             currentResolution =
                 when (checkedId) {
@@ -198,6 +237,7 @@ class H264EncodeActivity : AppCompatActivity() {
                     binding.resolution1080Radio.id -> ResolutionOption.P1080
                     else -> ResolutionOption.P720
                 }
+            rebuildProfileLevelControls()
             updateStaticInfo()
         }
         binding.bitrateGroup.setOnCheckedChangeListener { _, checkedId ->
@@ -210,21 +250,25 @@ class H264EncodeActivity : AppCompatActivity() {
             updateStaticInfo()
         }
         binding.profileGroup.setOnCheckedChangeListener { _, checkedId ->
-            currentProfile =
-                when (checkedId) {
-                    binding.profileMainRadio.id -> H264ProfileOption.MAIN
-                    binding.profileHighRadio.id -> H264ProfileOption.HIGH
-                    else -> H264ProfileOption.BASELINE
-                }
+            if (suppressProfileLevelCallbacks || checkedId == -1) return@setOnCheckedChangeListener
+            val profile = profileRadioValues[checkedId] ?: return@setOnCheckedChangeListener
+            if (currentCodec == VideoCodecOption.H264) {
+                currentAvcProfile = profile
+                rebuildLevelControlsForCurrentProfile()
+            } else {
+                currentHevcProfile = profile
+                rebuildLevelControlsForCurrentProfile()
+            }
             updateStaticInfo()
         }
         binding.levelGroup.setOnCheckedChangeListener { _, checkedId ->
-            currentLevel =
-                when (checkedId) {
-                    binding.level40Radio.id -> H264LevelOption.LEVEL_4_0
-                    binding.level41Radio.id -> H264LevelOption.LEVEL_4_1
-                    else -> H264LevelOption.LEVEL_3_1
-                }
+            if (suppressProfileLevelCallbacks || checkedId == -1) return@setOnCheckedChangeListener
+            val level = levelRadioValues[checkedId] ?: return@setOnCheckedChangeListener
+            if (currentCodec == VideoCodecOption.H264) {
+                currentAvcLevel = level
+            } else {
+                currentHevcLevel = level
+            }
             updateStaticInfo()
         }
         binding.iframeGroup.setOnCheckedChangeListener { _, checkedId ->
@@ -237,12 +281,14 @@ class H264EncodeActivity : AppCompatActivity() {
             updateStaticInfo()
         }
 
+        rebuildProfileLevelControls()
         updateStaticInfo()
         updatePermissionUi()
     }
 
     override fun onResume() {
         super.onResume()
+        Log.d(TAG, "onResume textureAvailable=${binding.previewTexture.isAvailable}")
         startBackgroundThread()
         if (binding.previewTexture.isAvailable) {
             openCameraWhenReady()
@@ -252,6 +298,7 @@ class H264EncodeActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        Log.d(TAG, "onPause")
         stopEncoding()
         closeCamera()
         stopBackgroundThread()
@@ -259,6 +306,7 @@ class H264EncodeActivity : AppCompatActivity() {
     }
 
     private fun ensurePermissionAndStartPreview() {
+        Log.d(TAG, "ensurePermissionAndStartPreview hasPermission=${hasCameraPermission()}")
         if (hasCameraPermission()) {
             openCameraWhenReady(forceReopen = true)
         } else {
@@ -272,6 +320,14 @@ class H264EncodeActivity : AppCompatActivity() {
     }
 
     private fun openCameraWhenReady(forceReopen: Boolean = false) {
+        Log.d(
+            TAG,
+            "openCameraWhenReady forceReopen=$forceReopen hasPermission=${hasCameraPermission()} " +
+                "textureAvailable=${binding.previewTexture.isAvailable} cameraDeviceNull=${cameraDevice == null} " +
+                "isOpeningCamera=$isOpeningCamera " +
+                "textureSize=${binding.previewTexture.width}x${binding.previewTexture.height} " +
+                "handlerNull=${backgroundHandler == null}"
+        )
         if (!hasCameraPermission()) {
             showPermissionRequiredState(R.string.h264_encode_status_permission_required)
             return
@@ -287,12 +343,17 @@ class H264EncodeActivity : AppCompatActivity() {
             createCameraSession()
             return
         }
+        if (isOpeningCamera) {
+            Log.d(TAG, "openCameraWhenReady ignored because camera is already opening")
+            return
+        }
         openCamera()
     }
 
     private fun openCamera() {
         try {
             val cameraId = findCameraId(currentLensFacing)
+            Log.d(TAG, "openCamera lensFacing=$currentLensFacing cameraId=$cameraId")
             if (cameraId == null) {
                 val message = getString(R.string.h264_encode_status_no_camera, currentLensLabel())
                 binding.previewPlaceholder.visibility = View.VISIBLE
@@ -312,23 +373,43 @@ class H264EncodeActivity : AppCompatActivity() {
                 binding.previewTexture.width,
                 binding.previewTexture.height
             )
+            Log.d(
+                TAG,
+                "openCamera previewSize=${previewSize?.width}x${previewSize?.height} " +
+                    "viewSize=${binding.previewTexture.width}x${binding.previewTexture.height}"
+            )
             configureTransform(binding.previewTexture.width, binding.previewTexture.height)
             val message = getString(R.string.h264_encode_status_opening, currentLensLabel())
             binding.previewPlaceholder.visibility = View.VISIBLE
             binding.previewPlaceholder.text = message
             updateStatus(message)
+            isOpeningCamera = true
+            Log.d(TAG, "calling cameraManager.openCamera cameraId=$cameraId")
             cameraManager.openCamera(cameraId, stateCallback, backgroundHandler)
         } catch (exception: CameraAccessException) {
+            isOpeningCamera = false
+            Log.e(TAG, "openCamera CameraAccessException", exception)
             updateStatus(getString(R.string.h264_encode_status_error, exception.message ?: "camera access error"))
         } catch (exception: SecurityException) {
+            isOpeningCamera = false
+            Log.e(TAG, "openCamera SecurityException", exception)
             showPermissionRequiredState(R.string.h264_encode_status_permission_required)
         }
     }
 
     private fun createCameraSession() {
-        val texture = binding.previewTexture.surfaceTexture ?: return
-        val camera = cameraDevice ?: return
-        val size = previewSize ?: return
+        val texture = binding.previewTexture.surfaceTexture
+        val camera = cameraDevice
+        val size = previewSize
+        if (texture == null || camera == null || size == null) {
+            Log.w(
+                TAG,
+                "createCameraSession skipped textureNull=${texture == null} " +
+                    "cameraNull=${camera == null} sizeNull=${size == null}"
+            )
+            return
+        }
+        Log.d(TAG, "createCameraSession cameraId=${camera.id} previewSize=${size.width}x${size.height}")
 
         try {
             cameraCaptureSession?.close()
@@ -337,6 +418,7 @@ class H264EncodeActivity : AppCompatActivity() {
             texture.setDefaultBufferSize(size.width, size.height)
             val previewSurface = Surface(texture)
             val surfaces = mutableListOf(previewSurface)
+            Log.d(TAG, "createCameraSession preview surface created")
 
             val template =
                 if (isEncoding && encoderSurface != null) {
@@ -361,6 +443,7 @@ class H264EncodeActivity : AppCompatActivity() {
                 surfaces,
                 object : CameraCaptureSession.StateCallback() {
                     override fun onConfigured(session: CameraCaptureSession) {
+                        Log.d(TAG, "captureSession onConfigured")
                         if (cameraDevice == null) return
                         cameraCaptureSession = session
                         try {
@@ -369,11 +452,15 @@ class H264EncodeActivity : AppCompatActivity() {
                                 null,
                                 backgroundHandler
                             )
+                            Log.d(TAG, "captureSession setRepeatingRequest success")
                             postUi {
                                 binding.previewPlaceholder.visibility = View.GONE
                                 updateStatus(
                                     if (isEncoding) {
-                                        getString(R.string.h264_encode_status_encoding)
+                                        getString(
+                                            R.string.h264_encode_status_encoding,
+                                            currentCodecLabel()
+                                        )
                                     } else {
                                         getString(
                                             R.string.h264_encode_status_previewing,
@@ -395,6 +482,7 @@ class H264EncodeActivity : AppCompatActivity() {
                     }
 
                     override fun onConfigureFailed(session: CameraCaptureSession) {
+                        Log.e(TAG, "captureSession onConfigureFailed")
                         postUi {
                             updateStatus(
                                 getString(
@@ -408,6 +496,7 @@ class H264EncodeActivity : AppCompatActivity() {
                 backgroundHandler
             )
         } catch (exception: CameraAccessException) {
+            Log.e(TAG, "createCameraSession CameraAccessException", exception)
             updateStatus(getString(R.string.h264_encode_status_error, exception.message ?: "camera session error"))
         }
     }
@@ -426,6 +515,7 @@ class H264EncodeActivity : AppCompatActivity() {
             encodedFrameCount = 0
             isEncoding = true
             latestAnalyzableFile = null
+            latestAnalyzableCodec = null
             binding.frameCountText.text =
                 getString(R.string.h264_encode_frame_count_value, encodedFrameCount)
             binding.probeInfoText.text = getString(R.string.h264_encode_probe_empty)
@@ -434,7 +524,7 @@ class H264EncodeActivity : AppCompatActivity() {
             binding.stopButton.isEnabled = true
             createCameraSession()
             startDrainThread()
-            updateStatus(getString(R.string.h264_encode_status_encoding))
+            updateStatus(getString(R.string.h264_encode_status_encoding, currentCodecLabel()))
         } catch (exception: Exception) {
             releaseEncoder()
             updateStatus(
@@ -476,6 +566,8 @@ class H264EncodeActivity : AppCompatActivity() {
     }
 
     private fun closeCamera() {
+        Log.d(TAG, "closeCamera sessionNull=${cameraCaptureSession == null} cameraNull=${cameraDevice == null}")
+        isOpeningCamera = false
         cameraCaptureSession?.close()
         cameraCaptureSession = null
         cameraDevice?.close()
@@ -489,16 +581,33 @@ class H264EncodeActivity : AppCompatActivity() {
         val encodeWidth = currentResolution.width
         val encodeHeight = currentResolution.height
 
-        val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, encodeWidth, encodeHeight).apply {
+        val encoderInfo = findHardwareEncoder(currentCodec.mimeType, encodeWidth, encodeHeight)
+            ?: throw IllegalStateException("No hardware ${currentCodecLabel()} encoder found")
+
+        val format = MediaFormat.createVideoFormat(currentCodec.mimeType, encodeWidth, encodeHeight).apply {
             setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
             setInteger(MediaFormat.KEY_BIT_RATE, currentBitrate.bitrate)
             setInteger(MediaFormat.KEY_FRAME_RATE, encodeFrameRate)
-            setInteger(MediaFormat.KEY_PROFILE, currentProfile.profile)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, currentIFrameInterval.seconds)
-            setInteger(MediaFormat.KEY_LEVEL, currentLevel.level)
+            if (currentCodec == VideoCodecOption.H264) {
+                val avcProfile = currentAvcProfile
+                val avcLevel = currentAvcLevel
+                if (avcProfile != null && avcLevel != null) {
+                    setInteger(MediaFormat.KEY_PROFILE, avcProfile)
+                    setInteger(MediaFormat.KEY_LEVEL, avcLevel)
+                }
+            } else {
+                val hevcProfile = currentHevcProfile
+                val hevcLevel = currentHevcLevel
+                if (hevcProfile != null && hevcLevel != null) {
+                    setInteger(MediaFormat.KEY_PROFILE, hevcProfile)
+                    setInteger(MediaFormat.KEY_LEVEL, hevcLevel)
+                }
+            }
         }
 
-        mediaCodec = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC).apply {
+        Log.d(TAG, "setupEncoder codec=${currentCodec.mimeType} encoder=${encoderInfo.name}")
+        mediaCodec = MediaCodec.createByCodecName(encoderInfo.name).apply {
             configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             encoderSurface = createInputSurface()
             start()
@@ -511,7 +620,7 @@ class H264EncodeActivity : AppCompatActivity() {
     private fun startDrainThread() {
         val codec = mediaCodec ?: return
         val outputStream = encoderOutputStream ?: return
-        drainThread = thread(start = true, name = "H264DrainThread") {
+        drainThread = thread(start = true, name = "${currentCodec.fileTag.uppercase(Locale.US)}DrainThread") {
             val bufferInfo = MediaCodec.BufferInfo()
             var wroteCodecConfig = false
             while (isEncoding || codecHasPendingOutput(codec, bufferInfo)) {
@@ -529,9 +638,9 @@ class H264EncodeActivity : AppCompatActivity() {
                         if (outputBuffer != null && bufferInfo.size > 0) {
                             outputBuffer.position(bufferInfo.offset)
                             outputBuffer.limit(bufferInfo.offset + bufferInfo.size)
+                            val bytes = ByteArray(bufferInfo.size)
+                            outputBuffer.get(bytes)
                             if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
-                                val bytes = ByteArray(bufferInfo.size)
-                                outputBuffer.get(bytes)
                                 outputStream.write(bytes)
                                 encodedFrameCount++
                                 postUi {
@@ -541,6 +650,9 @@ class H264EncodeActivity : AppCompatActivity() {
                                             encodedFrameCount
                                         )
                                 }
+                            } else if (!wroteCodecConfig) {
+                                outputStream.write(bytes)
+                                wroteCodecConfig = true
                             }
                         }
                         codec.releaseOutputBuffer(index, false)
@@ -568,7 +680,7 @@ class H264EncodeActivity : AppCompatActivity() {
     }
 
     private fun writeCodecSpecificData(format: MediaFormat, outputStream: FileOutputStream) {
-        listOf("csd-0", "csd-1").forEach { key ->
+        listOf("csd-0", "csd-1", "csd-2").forEach { key ->
             format.getByteBuffer(key)?.let { buffer ->
                 val bytes = ByteArray(buffer.remaining())
                 buffer.get(bytes)
@@ -608,6 +720,24 @@ class H264EncodeActivity : AppCompatActivity() {
     }
 
     private fun probeOutputFile(file: File) {
+        latestAnalyzableFile = null
+        latestAnalyzableCodec = null
+        binding.openFullAnalyzerButton.isEnabled = false
+        if (currentCodec != VideoCodecOption.H264) {
+            latestAnalyzableFile = if (file.exists() && file.length() > 0L) file else null
+            latestAnalyzableCodec = if (latestAnalyzableFile != null) currentCodec else null
+            binding.openFullAnalyzerButton.isEnabled = latestAnalyzableFile != null
+            binding.probeInfoText.text =
+                getString(
+                    R.string.h264_encode_probe_basic_summary,
+                    file.length(),
+                    currentCodec.fileExtension,
+                    currentCodecLabel(),
+                    file.absolutePath
+                )
+            return
+        }
+
         binding.probeInfoText.text = getString(R.string.h264_encode_probe_loading)
         thread(start = true, name = "H264ProbeThread") {
             val raw = runCatching {
@@ -615,6 +745,7 @@ class H264EncodeActivity : AppCompatActivity() {
             }
             postUi {
                 latestAnalyzableFile = if (file.exists() && file.length() > 0L) file else null
+                latestAnalyzableCodec = if (latestAnalyzableFile != null) VideoCodecOption.H264 else null
                 binding.openFullAnalyzerButton.isEnabled = latestAnalyzableFile != null
                 binding.probeInfoText.text =
                     raw.fold(
@@ -698,17 +829,190 @@ class H264EncodeActivity : AppCompatActivity() {
         backgroundThread = HandlerThread("H264EncodeCameraThread").also { thread ->
             thread.start()
             backgroundHandler = Handler(thread.looper)
+            Log.d(TAG, "startBackgroundThread thread=${thread.name}")
         }
     }
 
     private fun stopBackgroundThread() {
+        Log.d(TAG, "stopBackgroundThread")
         backgroundThread?.quitSafely()
         backgroundThread?.join()
         backgroundThread = null
         backgroundHandler = null
     }
 
+    private fun rebuildProfileLevelControls() {
+        suppressProfileLevelCallbacks = true
+        profileRadioValues.clear()
+        binding.profileGroup.removeAllViews()
+
+        if (currentCodec == VideoCodecOption.H264) {
+            binding.profileTitleText.text = getString(R.string.h264_encode_profile_title)
+            val profileLevels = currentEncoderProfileLevels()
+            val profiles = profileLevels.map { it.profile }.distinct().sorted()
+            if (profiles.isEmpty()) {
+                currentAvcProfile = null
+                addUnavailableRadioButton(binding.profileGroup)
+            } else {
+                if (currentAvcProfile !in profiles) {
+                    currentAvcProfile = profiles.first()
+                }
+                profiles.forEach { profile ->
+                    addProfileRadioButton(avcProfileName(profile), profile)
+                }
+                binding.profileGroup.check(
+                    profileRadioValues.entries.firstOrNull { it.value == currentAvcProfile }?.key
+                        ?: binding.profileGroup.getChildAt(0)?.id
+                        ?: -1
+                )
+            }
+        } else {
+            binding.profileTitleText.text = getString(R.string.h264_encode_hevc_profile_title)
+            val profileLevels = currentEncoderProfileLevels()
+            val profiles = profileLevels.map { it.profile }.distinct().sorted()
+            if (profiles.isEmpty()) {
+                currentHevcProfile = null
+                addUnavailableRadioButton(binding.profileGroup)
+            } else {
+                if (currentHevcProfile !in profiles) {
+                    currentHevcProfile = profiles.first()
+                }
+                profiles.forEach { profile ->
+                    addProfileRadioButton(hevcProfileName(profile), profile)
+                }
+                binding.profileGroup.check(
+                    profileRadioValues.entries.firstOrNull { it.value == currentHevcProfile }?.key
+                        ?: binding.profileGroup.getChildAt(0)?.id
+                        ?: -1
+                )
+            }
+        }
+
+        suppressProfileLevelCallbacks = false
+        rebuildLevelControlsForCurrentProfile()
+    }
+
+    private fun rebuildLevelControlsForCurrentProfile() {
+        val previousSuppressState = suppressProfileLevelCallbacks
+        suppressProfileLevelCallbacks = true
+        levelRadioValues.clear()
+        binding.levelGroup.removeAllViews()
+
+        if (currentCodec == VideoCodecOption.H264) {
+            binding.levelTitleText.text = getString(R.string.h264_encode_level_title)
+            val selectedProfile = currentAvcProfile
+            val levels =
+                if (selectedProfile == null) {
+                    emptyList()
+                } else {
+                    currentEncoderProfileLevels()
+                        .filter { it.profile == selectedProfile }
+                        .map { it.level }
+                        .distinct()
+                        .sorted()
+                }
+
+            if (levels.isEmpty()) {
+                currentAvcLevel = null
+                addUnavailableRadioButton(binding.levelGroup)
+            } else {
+                if (currentAvcLevel !in levels) {
+                    currentAvcLevel = levels.first()
+                }
+                levels.forEach { level ->
+                    addLevelRadioButton(avcLevelName(level), level)
+                }
+                binding.levelGroup.check(
+                    levelRadioValues.entries.firstOrNull { it.value == currentAvcLevel }?.key
+                        ?: binding.levelGroup.getChildAt(0)?.id
+                        ?: -1
+                )
+            }
+        } else {
+            binding.levelTitleText.text = getString(R.string.h264_encode_hevc_level_title)
+            val selectedProfile = currentHevcProfile
+            val levels =
+                if (selectedProfile == null) {
+                    emptyList()
+                } else {
+                    currentEncoderProfileLevels()
+                        .filter { it.profile == selectedProfile }
+                        .map { it.level }
+                        .distinct()
+                        .sorted()
+                }
+
+            if (levels.isEmpty()) {
+                currentHevcLevel = null
+                addUnavailableRadioButton(binding.levelGroup)
+            } else {
+                if (currentHevcLevel !in levels) {
+                    currentHevcLevel = levels.first()
+                }
+                levels.forEach { level ->
+                    addLevelRadioButton(hevcLevelName(level), level)
+                }
+                binding.levelGroup.check(
+                    levelRadioValues.entries.firstOrNull { it.value == currentHevcLevel }?.key
+                        ?: binding.levelGroup.getChildAt(0)?.id
+                        ?: -1
+                )
+            }
+        }
+
+        suppressProfileLevelCallbacks = previousSuppressState
+    }
+
+    private fun addProfileRadioButton(label: String, profile: Int) {
+        val id = addRadioButton(binding.profileGroup, label)
+        profileRadioValues[id] = profile
+    }
+
+    private fun addLevelRadioButton(label: String, level: Int) {
+        val id = addRadioButton(binding.levelGroup, label)
+        levelRadioValues[id] = level
+    }
+
+    private fun addRadioButton(group: android.widget.RadioGroup, label: String): Int {
+        val id = View.generateViewId()
+        group.addView(
+            RadioButton(this).apply {
+                this.id = id
+                text = label
+                layoutParams = android.widget.RadioGroup.LayoutParams(
+                    android.widget.RadioGroup.LayoutParams.MATCH_PARENT,
+                    android.widget.RadioGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    if (group.childCount > 0) {
+                        topMargin = dp(4)
+                    }
+                }
+            }
+        )
+        return id
+    }
+
+    private fun addUnavailableRadioButton(group: android.widget.RadioGroup) {
+        group.addView(
+            RadioButton(this).apply {
+                id = View.generateViewId()
+                text = getString(R.string.h264_encode_profile_level_unavailable)
+                isEnabled = false
+                layoutParams = android.widget.RadioGroup.LayoutParams(
+                    android.widget.RadioGroup.LayoutParams.MATCH_PARENT,
+                    android.widget.RadioGroup.LayoutParams.WRAP_CONTENT
+                )
+            }
+        )
+    }
+
     private fun updateStaticInfo() {
+        binding.codecText.text =
+            getString(
+                R.string.h264_encode_codec_value,
+                currentCodecLabel(),
+                currentCodec.mimeType
+            )
         binding.resolutionText.text =
             getString(
                 R.string.h264_encode_resolution_value,
@@ -718,10 +1022,39 @@ class H264EncodeActivity : AppCompatActivity() {
             )
         binding.bitrateText.text =
             getString(R.string.h264_encode_bitrate_value, currentBitrate.bitrate)
-        binding.profileText.text =
-            getString(R.string.h264_encode_profile_value, getString(currentProfile.labelRes))
-        binding.levelText.text =
-            getString(R.string.h264_encode_level_value, getString(currentLevel.labelRes))
+        binding.profileTitleText.visibility = View.VISIBLE
+        binding.profileGroup.visibility = View.VISIBLE
+        binding.levelTitleText.visibility = View.VISIBLE
+        binding.levelGroup.visibility = View.VISIBLE
+        binding.profileText.visibility = View.VISIBLE
+        binding.levelText.visibility = View.VISIBLE
+        if (currentCodec == VideoCodecOption.H264) {
+            binding.profileText.text =
+                getString(
+                    R.string.h264_encode_profile_value,
+                    currentAvcProfile?.let(::avcProfileName)
+                        ?: getString(R.string.h264_encode_profile_level_unavailable)
+                )
+            binding.levelText.text =
+                getString(
+                    R.string.h264_encode_level_value,
+                    currentAvcLevel?.let(::avcLevelName)
+                        ?: getString(R.string.h264_encode_profile_level_unavailable)
+                )
+        } else {
+            binding.profileText.text =
+                getString(
+                    R.string.h264_encode_profile_value,
+                    currentHevcProfile?.let(::hevcProfileName)
+                        ?: getString(R.string.h264_encode_profile_level_unavailable)
+                )
+            binding.levelText.text =
+                getString(
+                    R.string.h264_encode_level_value,
+                    currentHevcLevel?.let(::hevcLevelName)
+                        ?: getString(R.string.h264_encode_profile_level_unavailable)
+                )
+        }
         binding.iframeIntervalText.text =
             getString(R.string.h264_encode_iframe_value, currentIFrameInterval.seconds)
         binding.frameCountText.text =
@@ -733,6 +1066,7 @@ class H264EncodeActivity : AppCompatActivity() {
             )
         binding.probeInfoText.text = getString(R.string.h264_encode_probe_empty)
         latestAnalyzableFile = null
+        latestAnalyzableCodec = null
         binding.openFullAnalyzerButton.isEnabled = false
     }
 
@@ -743,7 +1077,13 @@ class H264EncodeActivity : AppCompatActivity() {
             updateStatus(getString(R.string.h264_encode_probe_open_full_missing))
             return
         }
-        startActivity(H264StreamAnalyzerActivity.createIntent(this, file.absolutePath))
+        val analyzerCodec = latestAnalyzableCodec ?: currentCodec
+        val intent =
+            when (analyzerCodec) {
+                VideoCodecOption.H264 -> H264StreamAnalyzerActivity.createIntent(this, file.absolutePath)
+                VideoCodecOption.H265 -> H265StreamAnalyzerActivity.createIntent(this, file.absolutePath)
+            }
+        startActivity(intent)
     }
 
     private fun updatePermissionUi() {
@@ -778,15 +1118,20 @@ class H264EncodeActivity : AppCompatActivity() {
     }
 
     private fun updateStatus(text: String) {
+        Log.d(TAG, "updateStatus text=$text")
         binding.statusText.text = text
     }
 
     private fun setParameterControlsEnabled(enabled: Boolean) {
+        binding.codecGroup.isEnabled = enabled
         binding.resolutionGroup.isEnabled = enabled
         binding.bitrateGroup.isEnabled = enabled
         binding.profileGroup.isEnabled = enabled
         binding.levelGroup.isEnabled = enabled
         binding.iframeGroup.isEnabled = enabled
+        for (index in 0 until binding.codecGroup.childCount) {
+            binding.codecGroup.getChildAt(index).isEnabled = enabled
+        }
         for (index in 0 until binding.resolutionGroup.childCount) {
             binding.resolutionGroup.getChildAt(index).isEnabled = enabled
         }
@@ -794,10 +1139,12 @@ class H264EncodeActivity : AppCompatActivity() {
             binding.bitrateGroup.getChildAt(index).isEnabled = enabled
         }
         for (index in 0 until binding.profileGroup.childCount) {
-            binding.profileGroup.getChildAt(index).isEnabled = enabled
+            val child = binding.profileGroup.getChildAt(index)
+            child.isEnabled = enabled && profileRadioValues.containsKey(child.id)
         }
         for (index in 0 until binding.levelGroup.childCount) {
-            binding.levelGroup.getChildAt(index).isEnabled = enabled
+            val child = binding.levelGroup.getChildAt(index)
+            child.isEnabled = enabled && levelRadioValues.containsKey(child.id)
         }
         for (index in 0 until binding.iframeGroup.childCount) {
             binding.iframeGroup.getChildAt(index).isEnabled = enabled
@@ -867,18 +1214,18 @@ class H264EncodeActivity : AppCompatActivity() {
         val formatter = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
         val fileName =
             "video_" +
+                currentCodec.fileTag +
+                "_" +
                 resolutionTag() +
                 "_" +
                 bitrateTag() +
-                "_" +
-                profileTag() +
-                "_" +
-                levelTag() +
+                profileLevelFileTag() +
                 "_" +
                 iframeTag() +
                 "_" +
                 formatter.format(Date()) +
-                ".h264"
+                "." +
+                currentCodec.fileExtension
         return File(videoDir, fileName)
     }
 
@@ -894,19 +1241,167 @@ class H264EncodeActivity : AppCompatActivity() {
         BitrateOption.BR_4M -> "4m"
     }
 
-    private fun profileTag(): String = when (currentProfile) {
-        H264ProfileOption.BASELINE -> "baseline"
-        H264ProfileOption.MAIN -> "main"
-        H264ProfileOption.HIGH -> "high"
-    }
-
-    private fun levelTag(): String = when (currentLevel) {
-        H264LevelOption.LEVEL_3_1 -> "l31"
-        H264LevelOption.LEVEL_4_0 -> "l40"
-        H264LevelOption.LEVEL_4_1 -> "l41"
+    private fun profileLevelFileTag(): String {
+        return when (currentCodec) {
+            VideoCodecOption.H264 -> {
+                val profile = currentAvcProfile
+                val level = currentAvcLevel
+                if (profile != null && level != null) {
+                    "_avc_p${profile}_l${level}"
+                } else {
+                    ""
+                }
+            }
+            VideoCodecOption.H265 -> {
+                val profile = currentHevcProfile
+                val level = currentHevcLevel
+                if (profile != null && level != null) {
+                    "_hevc_p${profile}_l${level}"
+                } else {
+                    ""
+                }
+            }
+        }
     }
 
     private fun iframeTag(): String = "gop${currentIFrameInterval.seconds}s"
+
+    private fun currentCodecLabel(): String = getString(currentCodec.labelRes)
+
+    private fun currentEncoderProfileLevels(): List<MediaCodecInfo.CodecProfileLevel> {
+        val encoderInfo = findHardwareEncoder(
+            currentCodec.mimeType,
+            currentResolution.width,
+            currentResolution.height
+        ) ?: return emptyList()
+
+        return runCatching {
+            encoderInfo.getCapabilitiesForType(currentCodec.mimeType)
+                .profileLevels
+                .distinctBy { "${it.profile}:${it.level}" }
+                .sortedWith(compareBy({ it.profile }, { it.level }))
+        }.getOrDefault(emptyList())
+    }
+
+    private fun findHardwareEncoder(mimeType: String, width: Int, height: Int): MediaCodecInfo? {
+        return MediaCodecList(MediaCodecList.ALL_CODECS)
+            .codecInfos
+            .asSequence()
+            .filter { codecInfo ->
+                codecInfo.isEncoder &&
+                    codecInfo.supportedTypes.any { supportedType ->
+                        supportedType.equals(mimeType, ignoreCase = true)
+                    }
+            }
+            .filter { codecInfo -> codecInfo.supportsVideoSize(mimeType, width, height) }
+            .firstOrNull(::isHardwareEncoder)
+    }
+
+    private fun MediaCodecInfo.supportsVideoSize(mimeType: String, width: Int, height: Int): Boolean {
+        return runCatching {
+            val videoCapabilities = getCapabilitiesForType(mimeType).videoCapabilities
+            videoCapabilities == null || videoCapabilities.isSizeSupported(width, height)
+        }.getOrDefault(false)
+    }
+
+    private fun isHardwareEncoder(codecInfo: MediaCodecInfo): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            return codecInfo.isHardwareAccelerated
+        }
+
+        val name = codecInfo.name.lowercase(Locale.US)
+        return !name.startsWith("omx.google.") &&
+            !name.startsWith("c2.android.") &&
+            !name.contains(".sw.") &&
+            !name.contains("software")
+    }
+
+    private fun avcProfileName(profile: Int): String {
+        return when (profile) {
+            MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline -> "Baseline"
+            MediaCodecInfo.CodecProfileLevel.AVCProfileMain -> "Main"
+            MediaCodecInfo.CodecProfileLevel.AVCProfileExtended -> "Extended"
+            MediaCodecInfo.CodecProfileLevel.AVCProfileHigh -> "High"
+            MediaCodecInfo.CodecProfileLevel.AVCProfileHigh10 -> "High 10"
+            MediaCodecInfo.CodecProfileLevel.AVCProfileHigh422 -> "High 4:2:2"
+            MediaCodecInfo.CodecProfileLevel.AVCProfileHigh444 -> "High 4:4:4"
+            MediaCodecInfo.CodecProfileLevel.AVCProfileConstrainedBaseline -> "Constrained Baseline"
+            MediaCodecInfo.CodecProfileLevel.AVCProfileConstrainedHigh -> "Constrained High"
+            else -> "Profile $profile"
+        }
+    }
+
+    private fun avcLevelName(level: Int): String {
+        return when (level) {
+            MediaCodecInfo.CodecProfileLevel.AVCLevel1 -> "Level 1"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel1b -> "Level 1b"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel11 -> "Level 1.1"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel12 -> "Level 1.2"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel13 -> "Level 1.3"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel2 -> "Level 2"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel21 -> "Level 2.1"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel22 -> "Level 2.2"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel3 -> "Level 3"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel31 -> "Level 3.1"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel32 -> "Level 3.2"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel4 -> "Level 4"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel41 -> "Level 4.1"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel42 -> "Level 4.2"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel5 -> "Level 5"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel51 -> "Level 5.1"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel52 -> "Level 5.2"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel6 -> "Level 6"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel61 -> "Level 6.1"
+            MediaCodecInfo.CodecProfileLevel.AVCLevel62 -> "Level 6.2"
+            else -> "Level $level"
+        }
+    }
+
+    private fun hevcProfileName(profile: Int): String {
+        return when (profile) {
+            MediaCodecInfo.CodecProfileLevel.HEVCProfileMain -> "Main"
+            MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10 -> "Main 10"
+            MediaCodecInfo.CodecProfileLevel.HEVCProfileMainStill -> "Main Still"
+            MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10HDR10 -> "Main 10 HDR10"
+            MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10HDR10Plus -> "Main 10 HDR10+"
+            else -> "Profile $profile"
+        }
+    }
+
+    private fun hevcLevelName(level: Int): String {
+        return when (level) {
+            1 -> "Main Tier Level 1"
+            2 -> "High Tier Level 1"
+            4 -> "Main Tier Level 2"
+            8 -> "High Tier Level 2"
+            16 -> "Main Tier Level 2.1"
+            32 -> "High Tier Level 2.1"
+            64 -> "Main Tier Level 3"
+            128 -> "High Tier Level 3"
+            256 -> "Main Tier Level 3.1"
+            512 -> "High Tier Level 3.1"
+            1024 -> "Main Tier Level 4"
+            2048 -> "High Tier Level 4"
+            4096 -> "Main Tier Level 4.1"
+            8192 -> "High Tier Level 4.1"
+            16384 -> "Main Tier Level 5"
+            32768 -> "High Tier Level 5"
+            65536 -> "Main Tier Level 5.1"
+            131072 -> "High Tier Level 5.1"
+            262144 -> "Main Tier Level 5.2"
+            524288 -> "High Tier Level 5.2"
+            1048576 -> "Main Tier Level 6"
+            2097152 -> "High Tier Level 6"
+            4194304 -> "Main Tier Level 6.1"
+            8388608 -> "High Tier Level 6.1"
+            16777216 -> "Main Tier Level 6.2"
+            33554432 -> "High Tier Level 6.2"
+            else -> "Level $level"
+        }
+    }
+
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 
     private fun postUi(action: () -> Unit) {
         if (isFinishing || isDestroyed) return

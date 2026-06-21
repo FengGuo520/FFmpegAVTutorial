@@ -15,6 +15,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FFmpegAVTutorial">
         <activity
+            android:name=".basic.DeviceCodecInfoActivity"
+            android:exported="false" />
+        <activity
             android:name=".basic.CameraInfoActivity"
             android:exported="false" />
         <activity
@@ -33,7 +36,10 @@
             android:name=".basic.H264StreamAnalyzerActivity"
             android:exported="false" />
         <activity
-            android:name=".basic.H264EncodeActivity"
+            android:name=".basic.H265StreamAnalyzerActivity"
+            android:exported="false" />
+        <activity
+            android:name=".basic.VideoEncodeActivity"
             android:exported="false" />
         <activity
             android:name=".audio.AudioCaptureActivity"

@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="#F4F7FB"
     android:orientation="vertical"
-    tools:context=".basic.H264EncodeActivity">
+    tools:context=".basic.VideoEncodeActivity">
 
     <View
         android:id="@+id/status_bar_space"
@@ -122,6 +122,37 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="14dp"
+                        android:text="@string/h264_encode_codec_title"
+                        android:textColor="#0F172A"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <RadioGroup
+                        android:id="@+id/codec_group"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:checkedButton="@id/codec_h264_radio"
+                        android:orientation="horizontal">
+
+                        <RadioButton
+                            android:id="@+id/codec_h264_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/h264_encode_codec_h264" />
+
+                        <RadioButton
+                            android:id="@+id/codec_h265_radio"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="@string/h264_encode_codec_h265" />
+                    </RadioGroup>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
                         android:text="@string/h264_encode_resolution_title"
                         android:textColor="#0F172A"
                         android:textSize="14sp"
@@ -195,6 +226,7 @@
                     </RadioGroup>
 
                     <TextView
+                        android:id="@+id/profile_title_text"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
@@ -209,30 +241,31 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:checkedButton="@id/profile_baseline_radio"
-                        android:orientation="horizontal">
+                        android:orientation="vertical">
 
                         <RadioButton
                             android:id="@+id/profile_baseline_radio"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:text="@string/h264_encode_profile_baseline" />
 
                         <RadioButton
                             android:id="@+id/profile_main_radio"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
+                            android:layout_marginTop="4dp"
                             android:text="@string/h264_encode_profile_main" />
 
                         <RadioButton
                             android:id="@+id/profile_high_radio"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
+                            android:layout_marginTop="4dp"
                             android:text="@string/h264_encode_profile_high" />
                     </RadioGroup>
 
                     <TextView
+                        android:id="@+id/level_title_text"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
@@ -247,26 +280,26 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:checkedButton="@id/level_31_radio"
-                        android:orientation="horizontal">
+                        android:orientation="vertical">
 
                         <RadioButton
                             android:id="@+id/level_31_radio"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:text="@string/h264_encode_level_31" />
 
                         <RadioButton
                             android:id="@+id/level_40_radio"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
+                            android:layout_marginTop="4dp"
                             android:text="@string/h264_encode_level_40" />
 
                         <RadioButton
                             android:id="@+id/level_41_radio"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
+                            android:layout_marginTop="4dp"
                             android:text="@string/h264_encode_level_41" />
                     </RadioGroup>
 
@@ -430,6 +463,15 @@
                         android:textColor="#0F172A"
                         android:textSize="18sp"
                         android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/codec_text"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:textColor="#334155"
+                        android:textSize="14sp"
+                        tools:text="Codec: H.264/AVC (video/avc)" />
 
                     <TextView
                         android:id="@+id/resolution_text"

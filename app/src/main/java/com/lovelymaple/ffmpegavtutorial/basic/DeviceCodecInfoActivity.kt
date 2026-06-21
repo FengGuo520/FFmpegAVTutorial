@@ -1,4 +1,4 @@
-package com.lovelymaple.ffmpegavtutorial
+package com.lovelymaple.ffmpegavtutorial.basic
 
 import android.media.MediaCodecInfo
 import android.media.MediaCodecList
@@ -17,6 +17,7 @@ import androidx.core.view.isVisible
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.chip.Chip
 import com.lovelymaple.ffmpegavtutorial.databinding.ActivityDeviceCodecInfoBinding
+import com.lovelymaple.ffmpegavtutorial.ui.setupStatusBarSpace
 
 class DeviceCodecInfoActivity : AppCompatActivity() {
 
