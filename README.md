@@ -2,7 +2,7 @@
 
 FFmpegAVTutorial 是一个面向 Android 平台的 FFmpeg API 学习工程。项目目标不是直接提供一个完整播放器，而是把 Android App、JNI、CMake、FFmpeg 静态库和常见音视频处理概念串起来，帮助学习者从“能把 FFmpeg 集成进 APK”开始，逐步理解媒体探测、读包、解码、渲染、音频输出等模块应该如何拆分和演进。
 
-当前工程已经内置 Android 端可运行的基础界面，并通过 JNI 调用 native 层 FFmpeg API，展示 FFmpeg 运行时版本、编译配置、协议、封装格式、解码器和编码器能力。首页还整理了一组音视频学习主题，用作后续扩展真实 demo 的目录骨架。
+当前工程已经内置 Android 端可运行的基础界面，并通过 JNI 调用 native 层 FFmpeg API，展示 FFmpeg 运行时版本、编译配置、协议、封装格式、解码器和编码器能力。同时，工程也提供了基于 Android `MediaCodecList` 的设备编解码能力检测页面，用于查看当前手机系统侧暴露的音视频编码器和解码器。首页还整理了一组音视频学习主题，用作后续扩展真实 demo 的目录骨架。
 
 ## 项目定位
 
@@ -10,6 +10,7 @@ FFmpegAVTutorial 是一个面向 Android 平台的 FFmpeg API 学习工程。项
 - 演示 Kotlin/Java 通过 JNI 调用 C++ native 层。
 - 演示 Android CMake 链接 FFmpeg/OpenSSL 预编译静态库。
 - 提供 FFmpeg runtime info 页面，用于确认当前 APK 中集成的 FFmpeg 能力。
+- 提供 Device Codec Info 页面，用于确认当前手机 MediaCodec 编解码能力。
 - 提供音视频学习目录，覆盖基础处理、视频渲染、音频渲染等方向。
 
 ## 当前功能
@@ -34,13 +35,27 @@ Android 页面会把 native 层返回的纯文本解析为分组卡片，按 Run
 
 首页通过 `FeatureCatalog` 维护学习条目，当前分为三组：
 
-- 音视频基础：Custom Thread、Movie Prober、Read Packet、Decode Packet、Custom Decoder。
+- 音视频基础：FFmpeg Runtime Info、Device Codec Info、Custom Thread、Movie Prober、Read Packet、Decode Packet、Custom Decoder。
 - 视频渲染：Core Animation/Core Graphics/Core Media、Legacy OpenGL、Modern OpenGL、Modern OpenGL(Rectangle Texture)、Metal。
 - 音频渲染：AudioUnit、AudioQueue。
 
-其中 FFmpeg Runtime Info 已经接入真实 native 能力，其余条目目前是说明型详情页，用来描述模块职责、学习重点和后续实践建议。这个设计适合把每个音视频主题逐步补成独立 demo。
+其中 FFmpeg Runtime Info 已经接入真实 native 能力，Device Codec Info 已经接入 Android 系统 `MediaCodecList` 能力，其余条目目前是说明型详情页，用来描述模块职责、学习重点和后续实践建议。这个设计适合把每个音视频主题逐步补成独立 demo。
 
-### 3. JNI 最小链路
+### 3. Device Codec Info
+
+入口：App 首页的 `Device Codec Info` 条目。
+
+该页面通过 Android `MediaCodecList(MediaCodecList.ALL_CODECS)` 枚举当前手机可用的系统编解码器，并按以下分组展示：
+
+- Video Decoders
+- Video Encoders
+- Audio Decoders
+- Audio Encoders
+- Other Codecs
+
+每个 codec 条目默认只展示 codec 名称、Encoder/Decoder 类型和 Hardware/Software/Vendor/Platform 标记；点击某一项后，再展开显示支持的 MIME type，以及系统能提供的 profile/level、视频宽高范围、帧率范围、码率范围、对齐要求、音频采样率和最大声道数等信息。profile/level 和 color format 会同时显示可读名称与 Android 原始整数值，例如 `AVCProfileHigh(8)/AVCLevel51(32768)`、`COLOR_FormatSurface(2130708361)`。这个页面适合用来判断当前设备是否支持 H.264、H.265/HEVC、AV1、AAC、Opus 等常见音视频格式，也适合和 FFmpeg runtime info 页面做对照：一个代表 APK 内 FFmpeg 能力，一个代表 Android 系统 MediaCodec 能力。
+
+### 4. JNI 最小链路
 
 工程保留了一个最小 JNI 示例：
 

@@ -19,10 +19,12 @@ sealed interface FeatureDestination {
     data object FFmpegInfo : FeatureDestination
     data object CameraInfo : FeatureDestination
     data object CameraPreview : FeatureDestination
+    data object DeviceCodecInfo : FeatureDestination
     data object H264ProfileLevelGuide : FeatureDestination
     data object H264StreamAnalyzer : FeatureDestination
+    data object H265StreamAnalyzer : FeatureDestination
     data object AudioCapture : FeatureDestination
-    data object H264Encode : FeatureDestination
+    data object VideoEncode : FeatureDestination
     data object AacEncode : FeatureDestination
     data object FlvMux : FeatureDestination
     data object LiveFlvMux : FeatureDestination
@@ -65,6 +67,12 @@ object FeatureCatalog {
                     destination = FeatureDestination.FFmpegInfo
                 ),
                 FeatureItem(
+                    id = "device_codec_info",
+                    titleRes = R.string.feature_device_codec_info_title,
+                    summaryRes = R.string.feature_device_codec_info_summary,
+                    destination = FeatureDestination.DeviceCodecInfo
+                ),
+                FeatureItem(
                     id = "custom_thread",
                     titleRes = R.string.feature_custom_thread_title,
                     summaryRes = R.string.feature_custom_thread_summary,
@@ -86,7 +94,7 @@ object FeatureCatalog {
                     id = "h264_encode",
                     titleRes = R.string.feature_h264_encode_title,
                     summaryRes = R.string.feature_h264_encode_summary,
-                    destination = FeatureDestination.H264Encode
+                    destination = FeatureDestination.VideoEncode
                 ),
                 FeatureItem(
                     id = "h264_profile_level_guide",
@@ -99,6 +107,12 @@ object FeatureCatalog {
                     titleRes = R.string.feature_h264_analyzer_title,
                     summaryRes = R.string.feature_h264_analyzer_summary,
                     destination = FeatureDestination.H264StreamAnalyzer
+                ),
+                FeatureItem(
+                    id = "h265_stream_analyzer",
+                    titleRes = R.string.feature_h265_analyzer_title,
+                    summaryRes = R.string.feature_h265_analyzer_summary,
+                    destination = FeatureDestination.H265StreamAnalyzer
                 ),
                 FeatureItem(
                     id = "decode_packet",

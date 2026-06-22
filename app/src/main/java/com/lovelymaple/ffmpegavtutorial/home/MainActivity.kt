@@ -8,10 +8,13 @@ import com.lovelymaple.ffmpegavtutorial.audio.AacEncodeActivity
 import com.lovelymaple.ffmpegavtutorial.audio.AudioCaptureActivity
 import com.lovelymaple.ffmpegavtutorial.basic.CameraInfoActivity
 import com.lovelymaple.ffmpegavtutorial.basic.CameraPreviewActivity
+import com.lovelymaple.ffmpegavtutorial.basic.DeviceCodecInfoActivity
 import com.lovelymaple.ffmpegavtutorial.basic.FFmpegInfoActivity
 import com.lovelymaple.ffmpegavtutorial.basic.H264EncodeActivity
 import com.lovelymaple.ffmpegavtutorial.basic.H264ProfileLevelGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.H264StreamAnalyzerActivity
+import com.lovelymaple.ffmpegavtutorial.basic.H265StreamAnalyzerActivity
+import com.lovelymaple.ffmpegavtutorial.basic.VideoEncodeActivity
 import com.lovelymaple.ffmpegavtutorial.container.FlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.LiveFlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.RtmpPushActivity
@@ -32,7 +35,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         supportActionBar?.hide()
         setupStatusBarSpace(this, binding.statusBarSpace, lightStatusBarIcons = true)
-        setupNavigationBarSpace(binding.navigationBarSpace)
         renderFeatureCatalog()
     }
 
@@ -60,11 +62,17 @@ class MainActivity : AppCompatActivity() {
                         FeatureDestination.CameraPreview -> {
                             startActivity(Intent(this, CameraPreviewActivity::class.java))
                         }
+                        FeatureDestination.DeviceCodecInfo -> {
+                            startActivity(Intent(this, DeviceCodecInfoActivity::class.java))
+                        }
                         FeatureDestination.AudioCapture -> {
                             startActivity(Intent(this, AudioCaptureActivity::class.java))
                         }
                         FeatureDestination.H264StreamAnalyzer -> {
                             startActivity(Intent(this, H264StreamAnalyzerActivity::class.java))
+                        }
+                        FeatureDestination.H265StreamAnalyzer -> {
+                            startActivity(Intent(this, H265StreamAnalyzerActivity::class.java))
                         }
                         FeatureDestination.H264ProfileLevelGuide -> {
                             startActivity(Intent(this, H264ProfileLevelGuideActivity::class.java))
@@ -81,8 +89,8 @@ class MainActivity : AppCompatActivity() {
                         FeatureDestination.RtmpPush -> {
                             startActivity(Intent(this, RtmpPushActivity::class.java))
                         }
-                        FeatureDestination.H264Encode -> {
-                            startActivity(Intent(this, H264EncodeActivity::class.java))
+                        FeatureDestination.VideoEncode -> {
+                            startActivity(Intent(this, VideoEncodeActivity::class.java))
                         }
                         is FeatureDestination.Detail -> {
                             startActivity(
