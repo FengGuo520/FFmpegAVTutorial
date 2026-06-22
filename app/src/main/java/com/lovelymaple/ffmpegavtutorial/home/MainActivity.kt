@@ -10,6 +10,7 @@ import com.lovelymaple.ffmpegavtutorial.basic.CameraInfoActivity
 import com.lovelymaple.ffmpegavtutorial.basic.CameraPreviewActivity
 import com.lovelymaple.ffmpegavtutorial.basic.FFmpegInfoActivity
 import com.lovelymaple.ffmpegavtutorial.basic.H264EncodeActivity
+import com.lovelymaple.ffmpegavtutorial.basic.H264ProfileLevelGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.H264StreamAnalyzerActivity
 import com.lovelymaple.ffmpegavtutorial.container.FlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.LiveFlvMuxActivity
@@ -64,6 +65,9 @@ class MainActivity : AppCompatActivity() {
                         }
                         FeatureDestination.H264StreamAnalyzer -> {
                             startActivity(Intent(this, H264StreamAnalyzerActivity::class.java))
+                        }
+                        FeatureDestination.H264ProfileLevelGuide -> {
+                            startActivity(Intent(this, H264ProfileLevelGuideActivity::class.java))
                         }
                         FeatureDestination.AacEncode -> {
                             startActivity(Intent(this, AacEncodeActivity::class.java))
