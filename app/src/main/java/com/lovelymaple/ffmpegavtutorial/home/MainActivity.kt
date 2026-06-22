@@ -10,7 +10,6 @@ import com.lovelymaple.ffmpegavtutorial.basic.CameraInfoActivity
 import com.lovelymaple.ffmpegavtutorial.basic.CameraPreviewActivity
 import com.lovelymaple.ffmpegavtutorial.basic.DeviceCodecInfoActivity
 import com.lovelymaple.ffmpegavtutorial.basic.FFmpegInfoActivity
-import com.lovelymaple.ffmpegavtutorial.basic.H264EncodeActivity
 import com.lovelymaple.ffmpegavtutorial.basic.H264ProfileLevelGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.H264StreamAnalyzerActivity
 import com.lovelymaple.ffmpegavtutorial.basic.H265StreamAnalyzerActivity
