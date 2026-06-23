@@ -42,6 +42,9 @@
             android:name=".basic.H265StreamAnalyzerActivity"
             android:exported="false" />
         <activity
+            android:name=".basic.VideoSoftEncodeActivity"
+            android:exported="false" />
+        <activity
             android:name=".basic.VideoEncodeActivity"
             android:exported="false" />
         <activity

@@ -62,6 +62,27 @@ public class NativeInstance {
 
     public native String closeSoftAacEncoder(long nativePtr);
 
+    public native String openSoftVideoEncoder(
+        long nativePtr,
+        String outputPath,
+        int width,
+        int height,
+        int frameRate,
+        int bitrate,
+        String profile,
+        int iFrameInterval
+    );
+
+    public native int writeSoftVideoFrame(
+        long nativePtr,
+        byte[] i420Data,
+        int width,
+        int height,
+        long ptsUs
+    );
+
+    public native String closeSoftVideoEncoder(long nativePtr);
+
     public long getNativePtr() {
         return nativePtr;
     }
@@ -175,6 +196,40 @@ public class NativeInstance {
 
     public String closeSoftAacEncoder() {
         return closeSoftAacEncoder(nativePtr);
+    }
+
+    public String openSoftVideoEncoder(
+        String outputPath,
+        int width,
+        int height,
+        int frameRate,
+        int bitrate,
+        String profile,
+        int iFrameInterval
+    ) {
+        return openSoftVideoEncoder(
+            nativePtr,
+            outputPath,
+            width,
+            height,
+            frameRate,
+            bitrate,
+            profile,
+            iFrameInterval
+        );
+    }
+
+    public int writeSoftVideoFrame(
+        byte[] i420Data,
+        int width,
+        int height,
+        long ptsUs
+    ) {
+        return writeSoftVideoFrame(nativePtr, i420Data, width, height, ptsUs);
+    }
+
+    public String closeSoftVideoEncoder() {
+        return closeSoftVideoEncoder(nativePtr);
     }
 
 //

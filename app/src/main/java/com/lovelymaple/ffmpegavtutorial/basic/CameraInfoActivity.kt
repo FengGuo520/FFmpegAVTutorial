@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.ImageFormat
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
@@ -136,6 +137,23 @@ class CameraInfoActivity : AppCompatActivity() {
             .take(6)
             .joinToString(separator = ", ") { "${it.width}x${it.height}" }
             .ifBlank { "Unavailable" }
+        val imageReaderSizes = streamMap
+            ?.getOutputSizes(ImageFormat.YUV_420_888)
+            ?.sortedByDescending { it.width * it.height }
+            .orEmpty()
+        val imageReaderSummary =
+            if (imageReaderSizes.isEmpty()) {
+                "Unavailable"
+            } else {
+                buildString {
+                    appendLine("Count: ${imageReaderSizes.size}")
+                    append(
+                        imageReaderSizes.joinToString(separator = ", ") {
+                            "${it.width}x${it.height}"
+                        }
+                    )
+                }
+            }
         val capabilities = characteristics
             .get(CameraCharacteristics.REQUEST_AVAILABLE_CAPABILITIES)
             ?.joinToString(separator = ", ") { capabilityLabel(it) }
@@ -182,6 +200,10 @@ class CameraInfoActivity : AppCompatActivity() {
             CameraSection(
                 title = "Preview Output Sizes",
                 content = previewSummary
+            ),
+            CameraSection(
+                title = "ImageReader (YUV_420_888) Output Sizes",
+                content = imageReaderSummary
             )
         )
 

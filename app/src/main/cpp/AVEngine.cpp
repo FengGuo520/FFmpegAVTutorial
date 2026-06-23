@@ -4,6 +4,7 @@
 
 #include <jni.h>
 #include <algorithm>
+#include <cctype>
 #include <cstring>
 #include <cstdio>
 #include <fstream>
@@ -24,6 +25,7 @@ extern "C" {
 #include "libavutil/avutil.h"
 #include "libavutil/channel_layout.h"
 #include "libavutil/error.h"
+#include "libavutil/frame.h"
 #include "libavutil/mathematics.h"
 #include "libavutil/opt.h"
 #include "libavutil/samplefmt.h"
@@ -63,12 +65,28 @@ struct SoftAacEncoder {
     bool headerWritten = false;
 };
 
+struct SoftVideoEncoder {
+    AVCodecContext *codecContext = nullptr;
+    FILE *outputFile = nullptr;
+    std::string outputPath;
+    int width = 0;
+    int height = 0;
+    int frameRate = 30;
+    int bitrate = 2000000;
+    int iFrameInterval = 2;
+    int frameCount = 0;
+    int packetCount = 0;
+    int64_t lastFramePts = AV_NOPTS_VALUE;
+};
+
 struct InstanceHolder {
     int keepalive = 1;
     std::mutex liveMuxerMutex;
     std::unique_ptr<LiveFlvMuxer> liveMuxer;
     std::mutex softAacEncoderMutex;
     std::unique_ptr<SoftAacEncoder> softAacEncoder;
+    std::mutex softVideoEncoderMutex;
+    std::unique_ptr<SoftVideoEncoder> softVideoEncoder;
 };
 
 jlong getInstanceHolderId(JNIEnv *env, jobject obj) {
@@ -985,6 +1003,281 @@ namespace {
         }
     }
 
+    void ReleaseSoftVideoEncoderResources(SoftVideoEncoder *encoder, bool removeOutputFile) {
+        if (encoder == nullptr) {
+            return;
+        }
+        if (encoder->outputFile != nullptr) {
+            std::fclose(encoder->outputFile);
+            encoder->outputFile = nullptr;
+        }
+        if (encoder->codecContext != nullptr) {
+            avcodec_free_context(&encoder->codecContext);
+        }
+        if (removeOutputFile && !encoder->outputPath.empty()) {
+            std::remove(encoder->outputPath.c_str());
+        }
+    }
+
+    int ReceiveSoftVideoPackets(SoftVideoEncoder *encoder) {
+        if (encoder == nullptr || encoder->codecContext == nullptr || encoder->outputFile == nullptr) {
+            return AVERROR(EINVAL);
+        }
+
+        int emittedPackets = 0;
+        AVPacket *packet = av_packet_alloc();
+        if (packet == nullptr) {
+            return AVERROR(ENOMEM);
+        }
+
+        while (true) {
+            int result = avcodec_receive_packet(encoder->codecContext, packet);
+            if (result == AVERROR(EAGAIN) || result == AVERROR_EOF) {
+                av_packet_free(&packet);
+                return emittedPackets;
+            }
+            if (result < 0) {
+                av_packet_free(&packet);
+                return result;
+            }
+
+            if (std::fwrite(packet->data, 1, static_cast<size_t>(packet->size), encoder->outputFile) !=
+                static_cast<size_t>(packet->size)) {
+                av_packet_unref(packet);
+                av_packet_free(&packet);
+                return AVERROR(EIO);
+            }
+
+            av_packet_unref(packet);
+            encoder->packetCount += 1;
+            emittedPackets += 1;
+        }
+    }
+
+    std::string NormalizeX264Profile(const std::string &profile) {
+        std::string normalized = profile;
+        std::transform(
+            normalized.begin(),
+            normalized.end(),
+            normalized.begin(),
+            [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); }
+        );
+        if (normalized == "baseline" || normalized == "main" || normalized == "high") {
+            return normalized;
+        }
+        return "baseline";
+    }
+
+    std::string OpenSoftVideoEncoder(
+        SoftVideoEncoder *encoder,
+        const std::string &outputPath,
+        int width,
+        int height,
+        int frameRate,
+        int bitrate,
+        const std::string &profile,
+        int iFrameInterval
+    ) {
+        if (encoder == nullptr) {
+            return "ERROR: soft video encoder session is null.";
+        }
+
+        const AVCodec *codec = avcodec_find_encoder_by_name("libx264");
+        if (codec == nullptr) {
+            return "ERROR: FFmpeg libx264 encoder is not available in this build.";
+        }
+
+        encoder->outputPath = outputPath;
+        encoder->width = std::max(width, 1);
+        encoder->height = std::max(height, 1);
+        encoder->frameRate = std::max(frameRate, 1);
+        encoder->bitrate = std::max(bitrate, 1);
+        encoder->iFrameInterval = std::max(iFrameInterval, 1);
+
+        encoder->codecContext = avcodec_alloc_context3(codec);
+        if (encoder->codecContext == nullptr) {
+            return "ERROR: failed to allocate libx264 codec context.";
+        }
+
+        encoder->codecContext->codec_type = AVMEDIA_TYPE_VIDEO;
+        encoder->codecContext->codec_id = AV_CODEC_ID_H264;
+        encoder->codecContext->width = encoder->width;
+        encoder->codecContext->height = encoder->height;
+        encoder->codecContext->pix_fmt = AV_PIX_FMT_YUV420P;
+        encoder->codecContext->bit_rate = encoder->bitrate;
+        encoder->codecContext->framerate = AVRational{encoder->frameRate, 1};
+        encoder->codecContext->time_base = AVRational{1, encoder->frameRate};
+        encoder->codecContext->gop_size = encoder->frameRate * encoder->iFrameInterval;
+        encoder->codecContext->max_b_frames = 0;
+        encoder->codecContext->thread_count = 1;
+
+        av_opt_set(encoder->codecContext->priv_data, "preset", "veryfast", 0);
+        av_opt_set(encoder->codecContext->priv_data, "tune", "zerolatency", 0);
+        av_opt_set(
+            encoder->codecContext->priv_data,
+            "x264-params",
+            "repeat-headers=1:annexb=1",
+            0
+        );
+        av_opt_set(
+            encoder->codecContext->priv_data,
+            "profile",
+            NormalizeX264Profile(profile).c_str(),
+            0
+        );
+
+        int result = avcodec_open2(encoder->codecContext, codec, nullptr);
+        if (result < 0) {
+            ReleaseSoftVideoEncoderResources(encoder, true);
+            return "ERROR: failed to open libx264 encoder: " + AvErrorToString(result);
+        }
+
+        encoder->outputFile = std::fopen(outputPath.c_str(), "wb");
+        if (encoder->outputFile == nullptr) {
+            ReleaseSoftVideoEncoderResources(encoder, true);
+            return "ERROR: failed to open H.264 output file.";
+        }
+
+        encoder->frameCount = 0;
+        encoder->packetCount = 0;
+        encoder->lastFramePts = AV_NOPTS_VALUE;
+        return "OK: FFmpeg libx264 soft video encoder started.";
+    }
+
+    int WriteSoftVideoFrame(
+        SoftVideoEncoder *encoder,
+        const uint8_t *data,
+        int size,
+        int width,
+        int height,
+        int64_t ptsUs
+    ) {
+        if (encoder == nullptr || encoder->codecContext == nullptr || encoder->outputFile == nullptr ||
+            data == nullptr || size <= 0) {
+            return AVERROR(EINVAL);
+        }
+        if (width != encoder->width || height != encoder->height) {
+            return AVERROR(EINVAL);
+        }
+
+        const int yPlaneSize = width * height;
+        const int uvPlaneSize = yPlaneSize / 4;
+        const int expectedSize = yPlaneSize + uvPlaneSize * 2;
+        if (size < expectedSize) {
+            return AVERROR(EINVAL);
+        }
+
+        AVFrame *frame = av_frame_alloc();
+        if (frame == nullptr) {
+            return AVERROR(ENOMEM);
+        }
+
+        frame->format = encoder->codecContext->pix_fmt;
+        frame->width = encoder->width;
+        frame->height = encoder->height;
+
+        int result = av_frame_get_buffer(frame, 32);
+        if (result < 0) {
+            av_frame_free(&frame);
+            return result;
+        }
+
+        result = av_frame_make_writable(frame);
+        if (result < 0) {
+            av_frame_free(&frame);
+            return result;
+        }
+
+        const uint8_t *ySource = data;
+        const uint8_t *uSource = data + yPlaneSize;
+        const uint8_t *vSource = data + yPlaneSize + uvPlaneSize;
+
+        for (int row = 0; row < height; ++row) {
+            std::memcpy(
+                frame->data[0] + row * frame->linesize[0],
+                ySource + row * width,
+                static_cast<size_t>(width)
+            );
+        }
+        for (int row = 0; row < height / 2; ++row) {
+            std::memcpy(
+                frame->data[1] + row * frame->linesize[1],
+                uSource + row * (width / 2),
+                static_cast<size_t>(width / 2)
+            );
+            std::memcpy(
+                frame->data[2] + row * frame->linesize[2],
+                vSource + row * (width / 2),
+                static_cast<size_t>(width / 2)
+            );
+        }
+
+        int64_t nextPts =
+            ptsUs > 0
+                ? av_rescale_q(ptsUs, AVRational{1, 1000000}, encoder->codecContext->time_base)
+                : encoder->frameCount;
+        if (encoder->lastFramePts != AV_NOPTS_VALUE && nextPts <= encoder->lastFramePts) {
+            nextPts = encoder->lastFramePts + 1;
+        }
+        frame->pts = nextPts;
+        encoder->lastFramePts = nextPts;
+
+        result = avcodec_send_frame(encoder->codecContext, frame);
+        av_frame_free(&frame);
+        if (result < 0) {
+            return result;
+        }
+
+        result = ReceiveSoftVideoPackets(encoder);
+        if (result < 0) {
+            return result;
+        }
+
+        encoder->frameCount += 1;
+        return result;
+    }
+
+    std::string CloseSoftVideoEncoder(std::unique_ptr<SoftVideoEncoder> &encoder) {
+        if (encoder == nullptr) {
+            return "FFmpeg libx264 soft video encoder was not running.";
+        }
+
+        int result = 0;
+        if (encoder->codecContext != nullptr) {
+            result = avcodec_send_frame(encoder->codecContext, nullptr);
+            if (result < 0) {
+                std::string message =
+                    "ERROR: failed to signal libx264 encoder end of stream: " + AvErrorToString(result);
+                ReleaseSoftVideoEncoderResources(encoder.get(), true);
+                encoder.reset();
+                return message;
+            }
+
+            result = ReceiveSoftVideoPackets(encoder.get());
+            if (result < 0) {
+                std::string message =
+                    "ERROR: failed to drain final libx264 packets: " + AvErrorToString(result);
+                ReleaseSoftVideoEncoderResources(encoder.get(), true);
+                encoder.reset();
+                return message;
+            }
+        }
+
+        if (encoder->outputFile != nullptr) {
+            std::fflush(encoder->outputFile);
+        }
+
+        std::ostringstream oss;
+        oss << "FFmpeg libx264 soft video encode completed.\n"
+            << "frames: " << encoder->frameCount << '\n'
+            << "packets: " << encoder->packetCount << '\n'
+            << "output: " << encoder->outputPath;
+
+        ReleaseSoftVideoEncoderResources(encoder.get(), false);
+        encoder.reset();
+        return oss.str();
+    }
+
     int ReceiveSoftAacPackets(SoftAacEncoder *encoder) {
         if (encoder == nullptr || encoder->codecContext == nullptr || encoder->outputContext == nullptr) {
             return AVERROR(EINVAL);
@@ -1759,6 +2052,99 @@ Java_io_ffmpegtutotial_player_internal_NativeInstance_openSoftAacEncoder(
     }
 
     env->ReleaseStringUTFChars(outputPath, outputPathChars);
+    return env->NewStringUTF(result.c_str());
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_io_ffmpegtutotial_player_internal_NativeInstance_openSoftVideoEncoder(
+    JNIEnv *env,
+    jobject obj,
+    jlong nativeHandle,
+    jstring outputPath,
+    jint width,
+    jint height,
+    jint frameRate,
+    jint bitrate,
+    jstring profile,
+    jint iFrameInterval
+) {
+    auto *holder = reinterpret_cast<InstanceHolder *>(nativeHandle);
+    if (holder == nullptr) {
+        return env->NewStringUTF("ERROR: native instance holder is null.");
+    }
+
+    const char *outputPathChars = env->GetStringUTFChars(outputPath, nullptr);
+    const char *profileChars = profile != nullptr ? env->GetStringUTFChars(profile, nullptr) : nullptr;
+
+    std::lock_guard<std::mutex> lock(holder->softVideoEncoderMutex);
+    if (holder->softVideoEncoder != nullptr) {
+        CloseSoftVideoEncoder(holder->softVideoEncoder);
+    }
+    holder->softVideoEncoder = std::make_unique<SoftVideoEncoder>();
+    std::string result = OpenSoftVideoEncoder(
+        holder->softVideoEncoder.get(),
+        outputPathChars,
+        width,
+        height,
+        frameRate,
+        bitrate,
+        profileChars != nullptr ? profileChars : "baseline",
+        iFrameInterval
+    );
+    if (result.rfind("OK:", 0) != 0) {
+        holder->softVideoEncoder.reset();
+    }
+
+    if (profileChars != nullptr) {
+        env->ReleaseStringUTFChars(profile, profileChars);
+    }
+    env->ReleaseStringUTFChars(outputPath, outputPathChars);
+    return env->NewStringUTF(result.c_str());
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_io_ffmpegtutotial_player_internal_NativeInstance_writeSoftVideoFrame(
+    JNIEnv *env,
+    jobject obj,
+    jlong nativeHandle,
+    jbyteArray i420Data,
+    jint width,
+    jint height,
+    jlong ptsUs
+) {
+    auto *holder = reinterpret_cast<InstanceHolder *>(nativeHandle);
+    if (holder == nullptr) {
+        return AVERROR(EINVAL);
+    }
+
+    std::vector<uint8_t> frameBytes = JByteArrayToVector(env, i420Data);
+    std::lock_guard<std::mutex> lock(holder->softVideoEncoderMutex);
+    return WriteSoftVideoFrame(
+        holder->softVideoEncoder.get(),
+        frameBytes.data(),
+        static_cast<int>(frameBytes.size()),
+        width,
+        height,
+        ptsUs
+    );
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_io_ffmpegtutotial_player_internal_NativeInstance_closeSoftVideoEncoder(
+    JNIEnv *env,
+    jobject obj,
+    jlong nativeHandle
+) {
+    auto *holder = reinterpret_cast<InstanceHolder *>(nativeHandle);
+    if (holder == nullptr) {
+        return env->NewStringUTF("ERROR: native instance holder is null.");
+    }
+
+    std::lock_guard<std::mutex> lock(holder->softVideoEncoderMutex);
+    std::string result = CloseSoftVideoEncoder(holder->softVideoEncoder);
     return env->NewStringUTF(result.c_str());
 }
 

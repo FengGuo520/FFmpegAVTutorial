@@ -14,6 +14,7 @@ import com.lovelymaple.ffmpegavtutorial.basic.H264ProfileLevelGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.H264StreamAnalyzerActivity
 import com.lovelymaple.ffmpegavtutorial.basic.H265StreamAnalyzerActivity
 import com.lovelymaple.ffmpegavtutorial.basic.VideoEncodeActivity
+import com.lovelymaple.ffmpegavtutorial.basic.VideoSoftEncodeActivity
 import com.lovelymaple.ffmpegavtutorial.container.FlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.LiveFlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.RtmpPushActivity
@@ -90,6 +91,9 @@ class MainActivity : AppCompatActivity() {
                         }
                         FeatureDestination.VideoEncode -> {
                             startActivity(Intent(this, VideoEncodeActivity::class.java))
+                        }
+                        FeatureDestination.VideoSoftEncode -> {
+                            startActivity(Intent(this, VideoSoftEncodeActivity::class.java))
                         }
                         is FeatureDestination.Detail -> {
                             startActivity(

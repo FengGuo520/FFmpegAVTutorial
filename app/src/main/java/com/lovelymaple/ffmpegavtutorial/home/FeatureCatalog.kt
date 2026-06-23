@@ -25,6 +25,7 @@ sealed interface FeatureDestination {
     data object H265StreamAnalyzer : FeatureDestination
     data object AudioCapture : FeatureDestination
     data object VideoEncode : FeatureDestination
+    data object VideoSoftEncode : FeatureDestination
     data object AacEncode : FeatureDestination
     data object FlvMux : FeatureDestination
     data object LiveFlvMux : FeatureDestination
@@ -95,6 +96,12 @@ object FeatureCatalog {
                     titleRes = R.string.feature_h264_encode_title,
                     summaryRes = R.string.feature_h264_encode_summary,
                     destination = FeatureDestination.VideoEncode
+                ),
+                FeatureItem(
+                    id = "video_soft_encode",
+                    titleRes = R.string.feature_video_soft_encode_title,
+                    summaryRes = R.string.feature_video_soft_encode_summary,
+                    destination = FeatureDestination.VideoSoftEncode
                 ),
                 FeatureItem(
                     id = "h264_profile_level_guide",

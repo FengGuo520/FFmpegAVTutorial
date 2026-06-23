@@ -20,6 +20,10 @@ set(OPENSSL_ROOT ${CMAKE_SOURCE_DIR})
 set(OPENSSL_INCLUDE_DIR ${OPENSSL_ROOT}/lib/openssl/include)
 set(OPENSSL_LIB_DIR ${OPENSSL_ROOT}/lib)
 
+set(X264_ROOT ${CMAKE_SOURCE_DIR})
+set(X264_INCLUDE_DIR ${X264_ROOT}/lib/x264/include)
+set(X264_LIB_DIR ${X264_ROOT}/lib)
+
 # Use only the new FFmpeg headers to avoid mixing old and new APIs.
 include_directories(
         ${FFMPEG_INCLUDE_CURRENT}
@@ -49,6 +53,9 @@ set_target_properties(ssl PROPERTIES IMPORTED_LOCATION ${OPENSSL_LIB_DIR}/openss
 add_library(crypto STATIC IMPORTED)
 set_target_properties(crypto PROPERTIES IMPORTED_LOCATION ${OPENSSL_LIB_DIR}/openssl/${ANDROID_ABI}/libcrypto.a)
 
+add_library(x264 STATIC IMPORTED)
+set_target_properties(x264 PROPERTIES IMPORTED_LOCATION ${OPENSSL_LIB_DIR}/x264/${ANDROID_ABI}/libx264.a)
+
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
 # You can define multiple libraries, and CMake builds them for you.
@@ -76,6 +83,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         log
         mediandk
         z
+        x264
         avcodec
         avformat
         avutil
