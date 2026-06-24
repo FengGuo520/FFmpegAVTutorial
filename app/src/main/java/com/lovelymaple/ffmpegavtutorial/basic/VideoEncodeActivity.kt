@@ -623,11 +623,17 @@ class VideoEncodeActivity : AppCompatActivity() {
         drainThread = thread(start = true, name = "${currentCodec.fileTag.uppercase(Locale.US)}DrainThread") {
             val bufferInfo = MediaCodec.BufferInfo()
             var wroteCodecConfig = false
+            var lastOutputPtsUs: Long? = null
             while (isEncoding || codecHasPendingOutput(codec, bufferInfo)) {
                 when (val index = codec.dequeueOutputBuffer(bufferInfo, 10_000)) {
                     MediaCodec.INFO_TRY_AGAIN_LATER -> Unit
                     MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                         val newFormat = codec.outputFormat
+                        Log.d(
+                            TAG,
+                            "video output format changed codec=${currentCodec.mimeType} " +
+                                "format=$newFormat csdSummary=${describeCodecSpecificData(newFormat)}"
+                        )
                         if (!wroteCodecConfig) {
                             writeCodecSpecificData(newFormat, outputStream)
                             wroteCodecConfig = true
@@ -635,6 +641,22 @@ class VideoEncodeActivity : AppCompatActivity() {
                     }
                     else -> if (index >= 0) {
                         val outputBuffer = codec.getOutputBuffer(index)
+                        val isCodecConfig =
+                            bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0
+                        val isEndOfStream =
+                            bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
+                        val isKeyFrame =
+                            bufferInfo.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0
+                        val deltaUs =
+                            lastOutputPtsUs?.let { bufferInfo.presentationTimeUs - it } ?: 0L
+                        Log.d(
+                            TAG,
+                            "video output packet index=$index codec=${currentCodec.fileTag} " +
+                                "ptsUs=${bufferInfo.presentationTimeUs} deltaUs=$deltaUs " +
+                                "size=${bufferInfo.size} offset=${bufferInfo.offset} " +
+                                "flags=${bufferInfo.flags} keyFrame=$isKeyFrame " +
+                                "codecConfig=$isCodecConfig eos=$isEndOfStream"
+                        )
                         if (outputBuffer != null && bufferInfo.size > 0) {
                             outputBuffer.position(bufferInfo.offset)
                             outputBuffer.limit(bufferInfo.offset + bufferInfo.size)
@@ -643,6 +665,7 @@ class VideoEncodeActivity : AppCompatActivity() {
                             if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
                                 outputStream.write(bytes)
                                 encodedFrameCount++
+                                lastOutputPtsUs = bufferInfo.presentationTimeUs
                                 postUi {
                                     binding.frameCountText.text =
                                         getString(
@@ -656,7 +679,7 @@ class VideoEncodeActivity : AppCompatActivity() {
                             }
                         }
                         codec.releaseOutputBuffer(index, false)
-                        if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
+                        if (isEndOfStream) {
                             break
                         }
                     }
@@ -687,6 +710,18 @@ class VideoEncodeActivity : AppCompatActivity() {
                 outputStream.write(bytes)
             }
         }
+    }
+
+    private fun describeCodecSpecificData(format: MediaFormat): String {
+        return listOf("csd-0", "csd-1", "csd-2")
+            .mapNotNull { key ->
+                format.getByteBuffer(key)?.duplicate()?.let { buffer ->
+                    buffer.position(0)
+                    "$key=${buffer.remaining()}B"
+                }
+            }
+            .ifEmpty { listOf("no-csd") }
+            .joinToString()
     }
 
     private fun releaseEncoder() {

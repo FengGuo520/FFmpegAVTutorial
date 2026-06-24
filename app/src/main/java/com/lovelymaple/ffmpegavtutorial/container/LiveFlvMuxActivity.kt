@@ -21,6 +21,7 @@ import android.media.MediaRecorder
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
+import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.TextureView
@@ -44,6 +45,10 @@ import kotlin.math.sqrt
 
 class LiveFlvMuxActivity : AppCompatActivity() {
 
+    companion object {
+        private const val TAG = "LiveFlvMuxActivity"
+    }
+
     private lateinit var binding: ActivityLiveFlvMuxBinding
     private lateinit var nativeInstance: NativeInstance
 
@@ -64,6 +69,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
     private var previewRequestBuilder: CaptureRequest.Builder? = null
     private var previewSize: Size? = null
     private var currentLensFacing: Int = CameraCharacteristics.LENS_FACING_BACK
+    @Volatile private var isOpeningCamera = false
 
     private var backgroundThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
@@ -105,9 +111,18 @@ class LiveFlvMuxActivity : AppCompatActivity() {
 
     private val permissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ ->
+            Log.d(
+                TAG,
+                "permission result camera=${hasCameraPermission()} audio=${hasAudioPermission()} " +
+                    "textureAvailable=${binding.previewTexture.isAvailable}"
+            )
             updateControls()
             if (hasCameraPermission()) {
-                openCameraWhenReady()
+                if (backgroundHandler == null) {
+                    Log.d(TAG, "camera permission granted but backgroundHandler is null, wait for onResume")
+                } else {
+                    openCameraWhenReady()
+                }
             }
             if (!hasAllPermissions()) {
                 updateStatus(getString(R.string.live_flv_mux_status_permission_required))
@@ -116,20 +131,27 @@ class LiveFlvMuxActivity : AppCompatActivity() {
 
     private val surfaceTextureListener = object : TextureView.SurfaceTextureListener {
         override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
+            Log.d(TAG, "surface available width=$width height=$height")
             openCameraWhenReady()
         }
 
         override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {
+            Log.d(TAG, "surface size changed width=$width height=$height")
             configureTransform(width, height)
         }
 
-        override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean = true
+        override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
+            Log.d(TAG, "surface destroyed")
+            return true
+        }
 
         override fun onSurfaceTextureUpdated(surface: SurfaceTexture) = Unit
     }
 
     private val stateCallback = object : CameraDevice.StateCallback() {
         override fun onOpened(camera: CameraDevice) {
+            Log.d(TAG, "camera onOpened id=${camera.id}")
+            isOpeningCamera = false
             cameraDevice = camera
             postUi {
                 createCameraSession()
@@ -137,6 +159,8 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         }
 
         override fun onDisconnected(camera: CameraDevice) {
+            Log.w(TAG, "camera onDisconnected id=${camera.id}")
+            isOpeningCamera = false
             camera.close()
             cameraDevice = null
             postUi {
@@ -146,6 +170,8 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         }
 
         override fun onError(camera: CameraDevice, error: Int) {
+            Log.e(TAG, "camera onError id=${camera.id} error=$error")
+            isOpeningCamera = false
             camera.close()
             cameraDevice = null
             postUi {
@@ -157,6 +183,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.d(TAG, "onCreate")
 
         binding = ActivityLiveFlvMuxBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -179,6 +206,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        Log.d(TAG, "onResume textureAvailable=${binding.previewTexture.isAvailable}")
         startBackgroundThread()
         if (binding.previewTexture.isAvailable) {
             openCameraWhenReady()
@@ -188,6 +216,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        Log.d(TAG, "onPause")
         stopStreaming()
         closeCamera()
         stopBackgroundThread()
@@ -224,6 +253,14 @@ class LiveFlvMuxActivity : AppCompatActivity() {
     private fun hasAllPermissions(): Boolean = hasCameraPermission() && hasAudioPermission()
 
     private fun openCameraWhenReady(forceReopen: Boolean = false) {
+        Log.d(
+            TAG,
+            "openCameraWhenReady forceReopen=$forceReopen hasCameraPermission=${hasCameraPermission()} " +
+                "textureAvailable=${binding.previewTexture.isAvailable} " +
+                "textureSize=${binding.previewTexture.width}x${binding.previewTexture.height} " +
+                "cameraDeviceNull=${cameraDevice == null} isOpeningCamera=$isOpeningCamera " +
+                "handlerNull=${backgroundHandler == null}"
+        )
         if (!hasCameraPermission()) {
             binding.previewPlaceholder.visibility = View.VISIBLE
             binding.previewPlaceholder.text =
@@ -233,11 +270,19 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         if (!binding.previewTexture.isAvailable) {
             return
         }
+        if (backgroundHandler == null) {
+            Log.d(TAG, "openCameraWhenReady skipped because backgroundHandler is null")
+            return
+        }
         if (forceReopen) {
             closeCamera()
         }
         if (cameraDevice != null) {
             createCameraSession()
+            return
+        }
+        if (isOpeningCamera) {
+            Log.d(TAG, "openCameraWhenReady ignored because camera is already opening")
             return
         }
         openCamera()
@@ -246,6 +291,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
     private fun openCamera() {
         try {
             val cameraId = findCameraId(currentLensFacing)
+            Log.d(TAG, "openCamera lensFacing=$currentLensFacing cameraId=$cameraId")
             if (cameraId == null) {
                 val message = getString(R.string.live_flv_mux_status_no_camera, currentLensLabel())
                 binding.previewPlaceholder.visibility = View.VISIBLE
@@ -265,15 +311,25 @@ class LiveFlvMuxActivity : AppCompatActivity() {
                 binding.previewTexture.width,
                 binding.previewTexture.height
             )
+            Log.d(
+                TAG,
+                "openCamera previewSize=${previewSize?.width}x${previewSize?.height} " +
+                    "viewSize=${binding.previewTexture.width}x${binding.previewTexture.height}"
+            )
             configureTransform(binding.previewTexture.width, binding.previewTexture.height)
             val message = getString(R.string.live_flv_mux_status_opening, currentLensLabel())
             binding.previewPlaceholder.visibility = View.VISIBLE
             binding.previewPlaceholder.text = message
             updateStatus(message)
+            isOpeningCamera = true
             cameraManager.openCamera(cameraId, stateCallback, backgroundHandler)
         } catch (exception: CameraAccessException) {
+            isOpeningCamera = false
+            Log.e(TAG, "openCamera CameraAccessException", exception)
             updateStatus(getString(R.string.live_flv_mux_status_error, exception.message ?: "camera access error"))
         } catch (exception: SecurityException) {
+            isOpeningCamera = false
+            Log.e(TAG, "openCamera SecurityException", exception)
             updateStatus(getString(R.string.live_flv_mux_status_permission_required))
         }
     }
@@ -845,6 +901,8 @@ class LiveFlvMuxActivity : AppCompatActivity() {
     }
 
     private fun closeCamera() {
+        Log.d(TAG, "closeCamera")
+        isOpeningCamera = false
         cameraCaptureSession?.close()
         cameraCaptureSession = null
         cameraDevice?.close()
@@ -853,6 +911,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
 
     private fun startBackgroundThread() {
         if (backgroundThread != null) return
+        Log.d(TAG, "startBackgroundThread")
         backgroundThread = HandlerThread("LiveFlvCameraThread").also { thread ->
             thread.start()
             backgroundHandler = Handler(thread.looper)
@@ -860,6 +919,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
     }
 
     private fun stopBackgroundThread() {
+        Log.d(TAG, "stopBackgroundThread")
         backgroundThread?.quitSafely()
         backgroundThread?.join()
         backgroundThread = null

@@ -11,6 +11,7 @@ import android.media.MediaFormat
 import android.media.MediaRecorder
 import android.os.Bundle
 import android.text.format.Formatter
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,6 +31,10 @@ import kotlin.concurrent.thread
 import kotlin.math.sqrt
 
 class AacEncodeActivity : AppCompatActivity() {
+
+    companion object {
+        private const val TAG = "AacEncodeActivity"
+    }
 
     private enum class EncodingMode(
         val labelRes: Int,
@@ -479,9 +484,21 @@ class AacEncodeActivity : AppCompatActivity() {
                 outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
                     return emittedPackets
                 }
-                outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> Unit
+                outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                    Log.d(TAG, "AAC output format changed: ${codec.outputFormat}")
+                }
                 outputIndex >= 0 -> {
                     val outputBuffer = codec.getOutputBuffer(outputIndex) ?: break
+                    val isCodecConfig =
+                        bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0
+                    val isEndOfStream =
+                        bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
+                    Log.d(
+                        TAG,
+                        "AAC output packet index=$outputIndex ptsUs=${bufferInfo.presentationTimeUs} " +
+                            "size=${bufferInfo.size} offset=${bufferInfo.offset} " +
+                            "flags=${bufferInfo.flags} codecConfig=$isCodecConfig eos=$isEndOfStream"
+                    )
                     if (bufferInfo.size > 0 &&
                         bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0
                     ) {
@@ -493,7 +510,7 @@ class AacEncodeActivity : AppCompatActivity() {
                         emittedPackets += 1
                     }
                     codec.releaseOutputBuffer(outputIndex, false)
-                    if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) {
+                    if (isEndOfStream) {
                         return emittedPackets
                     }
                 }

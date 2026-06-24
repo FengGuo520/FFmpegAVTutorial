@@ -427,6 +427,7 @@
     <string name="rtmp_push_start">Start Push</string>
     <string name="rtmp_push_stop">Stop Push</string>
     <string name="rtmp_push_runtime_title">Push Snapshot</string>
+    <string name="rtmp_push_url_label">RTMP URL</string>
     <string name="rtmp_push_url_hint">rtmp://your-server/live/streamKey</string>
     <string name="rtmp_push_url_empty">Please enter an RTMP URL before starting the push.</string>
     <string name="rtmp_push_status_idle">Ready to preview the camera and configure RTMP push.</string>

@@ -35,6 +35,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         supportActionBar?.hide()
         setupStatusBarSpace(this, binding.statusBarSpace, lightStatusBarIcons = true)
+        setupNavigationBarSpace(binding.navigationBarSpace)
         renderFeatureCatalog()
     }
 

@@ -104,17 +104,19 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
-                        android:hint="RTMP URL"
-                        app:boxBackgroundMode="outline">
+                        android:hint="@string/rtmp_push_url_label"
+                        app:boxBackgroundMode="outline"
+                        app:placeholderText="@string/rtmp_push_url_hint">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/url_input"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:hint="@string/rtmp_push_url_hint"
                             android:imeOptions="actionDone"
                             android:inputType="textUri"
                             android:maxLines="1"
+                            android:paddingTop="14dp"
+                            android:paddingBottom="14dp"
                             android:textColor="#0F172A"
                             android:textColorHint="#94A3B8" />
                     </com.google.android.material.textfield.TextInputLayout>
