@@ -15,10 +15,13 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FFmpegAVTutorial">
         <activity
-            android:name=".basic.DeviceCodecInfoActivity"
+            android:name=".basic.AvFrameGuideActivity"
             android:exported="false" />
         <activity
-            android:name=".basic.CameraInfoActivity"
+            android:name=".basic.AvBufferGuideActivity"
+            android:exported="false" />
+        <activity
+            android:name=".basic.AvRationalGuideActivity"
             android:exported="false" />
         <activity
             android:name=".container.RtmpPushActivity"
@@ -28,30 +31,6 @@
             android:exported="false" />
         <activity
             android:name=".container.FlvMuxActivity"
-            android:exported="false" />
-        <activity
-            android:name=".audio.AacEncodeActivity"
-            android:exported="false" />
-        <activity
-            android:name=".basic.H264ProfileLevelGuideActivity"
-            android:exported="false" />
-        <activity
-            android:name=".basic.H264StreamAnalyzerActivity"
-            android:exported="false" />
-        <activity
-            android:name=".basic.H265StreamAnalyzerActivity"
-            android:exported="false" />
-        <activity
-            android:name=".basic.VideoSoftEncodeActivity"
-            android:exported="false" />
-        <activity
-            android:name=".basic.VideoEncodeActivity"
-            android:exported="false" />
-        <activity
-            android:name=".audio.AudioCaptureActivity"
-            android:exported="false" />
-        <activity
-            android:name=".basic.CameraPreviewActivity"
             android:exported="false" />
         <activity
             android:name=".home.FeatureDetailActivity"

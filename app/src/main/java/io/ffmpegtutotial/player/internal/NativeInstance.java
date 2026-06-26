@@ -24,7 +24,11 @@ public class NativeInstance {
 
     public native String getInfo(long nativePtr);
 
-    public native String analyzeH264Stream(long nativePtr, String filePath);
+    public native void runAvRationalDemo(long nativePtr);
+
+    public native void runAvBufferDemo(long nativePtr);
+
+    public native void runAvFrameDemo(long nativePtr);
 
     public native String muxToFlv(long nativePtr, String videoPath, String audioPath, String outputPath);
 
@@ -49,40 +53,6 @@ public class NativeInstance {
 
     public native String closeLiveFlvMuxer(long nativePtr);
 
-    public native String openSoftAacEncoder(
-        long nativePtr,
-        String outputPath,
-        int sampleRate,
-        int channelCount,
-        int bitrate,
-        int profile
-    );
-
-    public native int writeSoftAacPcm(long nativePtr, byte[] pcmData, int size);
-
-    public native String closeSoftAacEncoder(long nativePtr);
-
-    public native String openSoftVideoEncoder(
-        long nativePtr,
-        String outputPath,
-        int width,
-        int height,
-        int frameRate,
-        int bitrate,
-        String profile,
-        int iFrameInterval
-    );
-
-    public native int writeSoftVideoFrame(
-        long nativePtr,
-        byte[] i420Data,
-        int width,
-        int height,
-        long ptsUs
-    );
-
-    public native String closeSoftVideoEncoder(long nativePtr);
-
     public long getNativePtr() {
         return nativePtr;
     }
@@ -91,8 +61,16 @@ public class NativeInstance {
         return getInfo(nativePtr);
     }
 
-    public String analyzeH264Stream(String filePath) {
-        return analyzeH264Stream(nativePtr, filePath);
+    public void runAvRationalDemo() {
+        runAvRationalDemo(nativePtr);
+    }
+
+    public void runAvBufferDemo() {
+        runAvBufferDemo(nativePtr);
+    }
+
+    public void runAvFrameDemo() {
+        runAvFrameDemo(nativePtr);
     }
 
     public String muxToFlv(String videoPath, String audioPath, String outputPath) {
@@ -178,58 +156,6 @@ public class NativeInstance {
 
     public String closeRtmpPush() {
         return closeLiveFlvMuxer();
-    }
-
-    public String openSoftAacEncoder(
-        String outputPath,
-        int sampleRate,
-        int channelCount,
-        int bitrate,
-        int profile
-    ) {
-        return openSoftAacEncoder(nativePtr, outputPath, sampleRate, channelCount, bitrate, profile);
-    }
-
-    public int writeSoftAacPcm(byte[] pcmData, int size) {
-        return writeSoftAacPcm(nativePtr, pcmData, size);
-    }
-
-    public String closeSoftAacEncoder() {
-        return closeSoftAacEncoder(nativePtr);
-    }
-
-    public String openSoftVideoEncoder(
-        String outputPath,
-        int width,
-        int height,
-        int frameRate,
-        int bitrate,
-        String profile,
-        int iFrameInterval
-    ) {
-        return openSoftVideoEncoder(
-            nativePtr,
-            outputPath,
-            width,
-            height,
-            frameRate,
-            bitrate,
-            profile,
-            iFrameInterval
-        );
-    }
-
-    public int writeSoftVideoFrame(
-        byte[] i420Data,
-        int width,
-        int height,
-        long ptsUs
-    ) {
-        return writeSoftVideoFrame(nativePtr, i420Data, width, height, ptsUs);
-    }
-
-    public String closeSoftVideoEncoder() {
-        return closeSoftVideoEncoder(nativePtr);
     }
 
 //

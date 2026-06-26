@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_av_frame_title">AVFrame Guide</string>
+    <string name="feature_av_frame_summary">介绍 FFmpeg 的 AVFrame：它承载什么数据、和 AVBufferRef 的关系，以及 alloc/ref/unref/make_writable 等基础 API。</string>
+
+    <string name="av_frame_page_title">AVFrame Guide</string>
+    <string name="av_frame_badge">FFmpeg Frame</string>
+    <string name="av_frame_back_arrow">←</string>
+    <string name="av_frame_headline">理解 AVFrame，要把“帧元信息”和“帧数据缓冲”同时看懂</string>
+    <string name="av_frame_description">AVFrame 是 FFmpeg 里最核心的数据载体之一。视频解码输出的是视频帧，音频解码输出的是音频帧，滤镜图、重采样、缩放和编码输入也都大量围绕 AVFrame 展开。它本身更像一个“帧对象外壳”，既包含 format、width、height、nb_samples、pts 这类描述信息，也包含 data、linesize、buf[] 这些真正指向数据缓冲区的字段。</string>
+
+    <string name="av_frame_role_title">AVFrame 的角色与作用</string>
+    <string name="av_frame_role_body">可以把 AVFrame 理解成“某一帧原始媒体数据 + 这一帧的描述信息”。对于视频，它描述像素格式、宽高、时间戳和每个平面的地址；对于音频，它描述采样格式、声道布局、采样点数量和每个声道平面的地址。很多时候 AVFrame 并不直接拥有内存，而是通过 buf[] / extended_buf[] 持有底层 AVBufferRef，这也是 FFmpeg 帧数据能安全共享、延迟复制和写时拷贝的基础。</string>
+
+    <string name="av_frame_fields_title">学习时最值得先盯住的字段</string>
+    <string name="av_frame_fields_body">视频常看：format、width、height、data[]、linesize[]、pts。音频常看：format、nb_samples、sample_rate、ch_layout、data[]、linesize[]、pts。进一步再看：buf[] 表示这帧绑定的引用计数缓冲区，extended_data 在平面较多时提供更完整的数据指针数组。只要把“描述字段”和“缓冲字段”分开看，很多 API 就不会混乱。</string>
+
+    <string name="av_frame_api_title">常用基础 API</string>
+    <string name="av_frame_api_body">最常用的一条链路通常是：av_frame_alloc 创建空 frame；填好 format、width/height 或 nb_samples 等元信息；调用 av_frame_get_buffer 真正申请带引用计数的底层缓冲；写数据前用 av_frame_make_writable 确保独占写权限；需要共享时用 av_frame_ref 或 av_frame_clone；使用完后用 av_frame_unref 释放这次绑定的数据，再用 av_frame_free 释放 frame 外壳本身。学习时一定要分清“释放帧引用的数据”和“释放帧结构体对象”是两层动作。</string>
+
+    <string name="av_frame_native_demo_title">Native Frame Demo</string>
+    <string name="av_frame_refresh">刷新 Native 演示</string>
+    <string name="av_frame_status_loading">正在执行 native AVFrame 演示，并输出到 Logcat...</string>
+    <string name="av_frame_status_ready">执行完成，请到 Logcat 查看 tag 为 AVFrameDemo 的详细 frame/buffer 关系和 copy-on-write 步骤。</string>
+    <string name="av_frame_status_error">Native 演示加载失败：%1$s</string>
+    <string name="av_frame_log_hint">这个区域不展示 native 返回文本。点击上方按钮后，请直接在 Logcat 中查看 tag 为 AVFrameDemo 的日志输出，里面会按步骤打印 AVFrame 的元信息、plane 地址、buf[0] 引用计数，以及 clone、make_writable、unref、free 的过程。</string>
+</resources>

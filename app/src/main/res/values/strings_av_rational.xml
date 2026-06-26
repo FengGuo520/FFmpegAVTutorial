@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_av_rational_title">AVRational Guide</string>
+    <string name="feature_av_rational_summary">专门讲解 FFmpeg 的 AVRational 结构体、时间基概念，以及常见 rational API 的 native 日志演示。</string>
+
+    <string name="av_rational_page_title">AVRational Guide</string>
+    <string name="av_rational_badge">FFmpeg Math</string>
+    <string name="av_rational_back_arrow">←</string>
+    <string name="av_rational_headline">先把 AVRational 看明白，再去理解 time_base / fps / pts</string>
+    <string name="av_rational_description">AVRational 是 FFmpeg 里最基础、也最容易反复遇到的结构体之一。视频帧率、流时间基、采样宽高比、时间戳换算，几乎都会和它打交道。这一页把“概念说明”和“native 日志演示”放在一起，方便你对照学习。</string>
+    <string name="av_rational_concept_title">什么是 AVRational</string>
+    <string name="av_rational_concept_body">它本质上就是一个分数结构体：num 表示分子，den 表示分母。FFmpeg 不喜欢直接用浮点数保存这些时间和比例关系，因为浮点会有精度损失；而 AVRational 能更稳定地表达 1/1000、1/90000、30000/1001 这种媒体处理中非常常见的比值。</string>
+    <string name="av_rational_api_title">相关 API 在干什么</string>
+    <string name="av_rational_api_body">常见 API 可以分成 4 类：1. 创建和约分，例如 av_make_q、av_d2q、av_reduce；2. 算术运算，例如 av_mul_q、av_div_q、av_add_q、av_sub_q、av_inv_q；3. 比较和选最近值，例如 av_cmp_q、av_nearer_q、av_find_nearest_q_idx；4. 时间戳换算，例如 av_rescale_q、av_rescale_q_rnd。理解这几类 API 后，再看 packet/frame 的 pts、stream 的 time_base，会顺很多。</string>
+    <string name="av_rational_native_demo_title">Native API Demo</string>
+    <string name="av_rational_refresh">刷新 Native 演示</string>
+    <string name="av_rational_status_loading">正在执行 native AVRational 演示，并输出到 Logcat...</string>
+    <string name="av_rational_status_ready">执行完成，请到 Logcat 查看 tag 为 AVRationalDemo 的详细步骤和结果。</string>
+    <string name="av_rational_status_error">Native 演示加载失败：%1$s</string>
+    <string name="av_rational_log_hint">这个区域不展示 native 返回文本。点击上方按钮后，请直接在 Logcat 中查看 tag 为 AVRationalDemo 的日志输出，里面会按步骤打印每个 API 的输入和结果。</string>
+</resources>

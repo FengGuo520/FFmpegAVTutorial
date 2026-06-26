@@ -4,17 +4,10 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import androidx.appcompat.app.AppCompatActivity
-import com.lovelymaple.ffmpegavtutorial.audio.AacEncodeActivity
-import com.lovelymaple.ffmpegavtutorial.audio.AudioCaptureActivity
-import com.lovelymaple.ffmpegavtutorial.basic.CameraInfoActivity
-import com.lovelymaple.ffmpegavtutorial.basic.CameraPreviewActivity
-import com.lovelymaple.ffmpegavtutorial.basic.DeviceCodecInfoActivity
+import com.lovelymaple.ffmpegavtutorial.basic.AvBufferGuideActivity
+import com.lovelymaple.ffmpegavtutorial.basic.AvFrameGuideActivity
+import com.lovelymaple.ffmpegavtutorial.basic.AvRationalGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.FFmpegInfoActivity
-import com.lovelymaple.ffmpegavtutorial.basic.H264ProfileLevelGuideActivity
-import com.lovelymaple.ffmpegavtutorial.basic.H264StreamAnalyzerActivity
-import com.lovelymaple.ffmpegavtutorial.basic.H265StreamAnalyzerActivity
-import com.lovelymaple.ffmpegavtutorial.basic.VideoEncodeActivity
-import com.lovelymaple.ffmpegavtutorial.basic.VideoSoftEncodeActivity
 import com.lovelymaple.ffmpegavtutorial.container.FlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.LiveFlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.RtmpPushActivity
@@ -57,29 +50,14 @@ class MainActivity : AppCompatActivity() {
                         FeatureDestination.FFmpegInfo -> {
                             startActivity(Intent(this, FFmpegInfoActivity::class.java))
                         }
-                        FeatureDestination.CameraInfo -> {
-                            startActivity(Intent(this, CameraInfoActivity::class.java))
+                        FeatureDestination.AvRationalGuide -> {
+                            startActivity(Intent(this, AvRationalGuideActivity::class.java))
                         }
-                        FeatureDestination.CameraPreview -> {
-                            startActivity(Intent(this, CameraPreviewActivity::class.java))
+                        FeatureDestination.AvBufferGuide -> {
+                            startActivity(Intent(this, AvBufferGuideActivity::class.java))
                         }
-                        FeatureDestination.DeviceCodecInfo -> {
-                            startActivity(Intent(this, DeviceCodecInfoActivity::class.java))
-                        }
-                        FeatureDestination.AudioCapture -> {
-                            startActivity(Intent(this, AudioCaptureActivity::class.java))
-                        }
-                        FeatureDestination.H264StreamAnalyzer -> {
-                            startActivity(Intent(this, H264StreamAnalyzerActivity::class.java))
-                        }
-                        FeatureDestination.H265StreamAnalyzer -> {
-                            startActivity(Intent(this, H265StreamAnalyzerActivity::class.java))
-                        }
-                        FeatureDestination.H264ProfileLevelGuide -> {
-                            startActivity(Intent(this, H264ProfileLevelGuideActivity::class.java))
-                        }
-                        FeatureDestination.AacEncode -> {
-                            startActivity(Intent(this, AacEncodeActivity::class.java))
+                        FeatureDestination.AvFrameGuide -> {
+                            startActivity(Intent(this, AvFrameGuideActivity::class.java))
                         }
                         FeatureDestination.FlvMux -> {
                             startActivity(Intent(this, FlvMuxActivity::class.java))
@@ -89,12 +67,6 @@ class MainActivity : AppCompatActivity() {
                         }
                         FeatureDestination.RtmpPush -> {
                             startActivity(Intent(this, RtmpPushActivity::class.java))
-                        }
-                        FeatureDestination.VideoEncode -> {
-                            startActivity(Intent(this, VideoEncodeActivity::class.java))
-                        }
-                        FeatureDestination.VideoSoftEncode -> {
-                            startActivity(Intent(this, VideoSoftEncodeActivity::class.java))
                         }
                         is FeatureDestination.Detail -> {
                             startActivity(

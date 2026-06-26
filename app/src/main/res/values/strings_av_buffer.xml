@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_av_buffer_title">AVBuffer Guide</string>
+    <string name="feature_av_buffer_summary">介绍 FFmpeg 的 AVBuffer / AVBufferRef、引用计数、可写性与 copy-on-write 的典型使用方式。</string>
+
+    <string name="av_buffer_page_title">AVBuffer Guide</string>
+    <string name="av_buffer_badge">FFmpeg Memory</string>
+    <string name="av_buffer_back_arrow">←</string>
+    <string name="av_buffer_headline">理解 AVBuffer，先抓住“数据本体”和“引用句柄”这对关系</string>
+    <string name="av_buffer_description">AVBuffer 是 FFmpeg 里做引用计数内存管理的基础设施。真正的数据缓冲区由 AVBuffer 持有，而调用方日常操作的大多是 AVBufferRef。只要把“谁拥有数据、谁只是引用、什么时候触发 copy-on-write”这几件事想清楚，后面看 AVPacket、AVFrame、硬件帧缓冲都会更顺。</string>
+    <string name="av_buffer_concept_title">AVBuffer / AVBufferRef 是什么</string>
+    <string name="av_buffer_concept_body">AVBuffer 可以理解成“数据本体 + 引用计数控制块”，它本身是 opaque 的；AVBufferRef 则是一个可直接操作的引用句柄，里面能看到 data 指针和 size。多个 AVBufferRef 可以同时指向同一个底层 AVBuffer，这就是 FFmpeg 引用计数内存模型的核心。</string>
+    <string name="av_buffer_refcount_title">FFmpeg 引用计数要怎么理解</string>
+    <string name="av_buffer_refcount_body">当你用 av_buffer_ref 复制一个引用时，底层数据不会复制，只是引用计数 +1。只有在“当前引用不再独占”但你又想写数据时，才会通过 av_buffer_make_writable 触发 copy-on-write，分裂出一份新的可写缓冲区。最后每个引用都通过 av_buffer_unref 释放，计数归零时底层内存才真正销毁。</string>
+    <string name="av_buffer_api_title">相关 API 在干什么</string>
+    <string name="av_buffer_api_body">常见 API 可以分成几组：1. 创建：av_buffer_alloc、av_buffer_allocz、av_buffer_create；2. 增减引用：av_buffer_ref、av_buffer_unref、av_buffer_get_ref_count；3. 可写性：av_buffer_is_writable、av_buffer_make_writable；4. 调整与替换：av_buffer_realloc、av_buffer_replace；5. 复用场景：AVBufferPool 相关接口。你学习时最值得先吃透的是 alloc / ref / unref / make_writable 这一条主链路。</string>
+    <string name="av_buffer_native_demo_title">Native RefCount Demo</string>
+    <string name="av_buffer_refresh">刷新 Native 演示</string>
+    <string name="av_buffer_status_loading">正在执行 native AVBuffer 演示，并输出到 Logcat...</string>
+    <string name="av_buffer_status_ready">执行完成，请到 Logcat 查看 tag 为 AVBufferDemo 的详细引用计数步骤和结果。</string>
+    <string name="av_buffer_status_error">Native 演示加载失败：%1$s</string>
+    <string name="av_buffer_log_hint">这个区域不展示 native 返回文本。点击上方按钮后，请直接在 Logcat 中查看 tag 为 AVBufferDemo 的日志输出，里面会按步骤打印 AVBufferRef 的引用计数、可写性、copy-on-write 和释放过程。</string>
+</resources>

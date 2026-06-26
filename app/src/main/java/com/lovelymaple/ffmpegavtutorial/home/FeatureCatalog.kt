@@ -17,16 +17,9 @@ data class FeatureItem(
 
 sealed interface FeatureDestination {
     data object FFmpegInfo : FeatureDestination
-    data object CameraInfo : FeatureDestination
-    data object CameraPreview : FeatureDestination
-    data object DeviceCodecInfo : FeatureDestination
-    data object H264ProfileLevelGuide : FeatureDestination
-    data object H264StreamAnalyzer : FeatureDestination
-    data object H265StreamAnalyzer : FeatureDestination
-    data object AudioCapture : FeatureDestination
-    data object VideoEncode : FeatureDestination
-    data object VideoSoftEncode : FeatureDestination
-    data object AacEncode : FeatureDestination
+    data object AvRationalGuide : FeatureDestination
+    data object AvBufferGuide : FeatureDestination
+    data object AvFrameGuide : FeatureDestination
     data object FlvMux : FeatureDestination
     data object LiveFlvMux : FeatureDestination
     data object RtmpPush : FeatureDestination
@@ -50,34 +43,34 @@ object FeatureCatalog {
             titleRes = R.string.section_basic,
             items = listOf(
                 FeatureItem(
-                    id = "camera_info",
-                    titleRes = R.string.feature_camera_info_title,
-                    summaryRes = R.string.feature_camera_info_summary,
-                    destination = FeatureDestination.CameraInfo
-                ),
-                FeatureItem(
-                    id = "camera_preview",
-                    titleRes = R.string.feature_camera_preview_title,
-                    summaryRes = R.string.feature_camera_preview_summary,
-                    destination = FeatureDestination.CameraPreview
-                ),
-                FeatureItem(
                     id = "opengl_version",
                     titleRes = R.string.feature_opengl_version_title,
                     summaryRes = R.string.feature_opengl_version_summary,
                     destination = FeatureDestination.FFmpegInfo
                 ),
                 FeatureItem(
-                    id = "device_codec_info",
-                    titleRes = R.string.feature_device_codec_info_title,
-                    summaryRes = R.string.feature_device_codec_info_summary,
-                    destination = FeatureDestination.DeviceCodecInfo
-                ),
-                FeatureItem(
                     id = "custom_thread",
                     titleRes = R.string.feature_custom_thread_title,
                     summaryRes = R.string.feature_custom_thread_summary,
                     destination = FeatureDestination.Detail("custom_thread")
+                ),
+                FeatureItem(
+                    id = "av_rational_guide",
+                    titleRes = R.string.feature_av_rational_title,
+                    summaryRes = R.string.feature_av_rational_summary,
+                    destination = FeatureDestination.AvRationalGuide
+                ),
+                FeatureItem(
+                    id = "av_buffer_guide",
+                    titleRes = R.string.feature_av_buffer_title,
+                    summaryRes = R.string.feature_av_buffer_summary,
+                    destination = FeatureDestination.AvBufferGuide
+                ),
+                FeatureItem(
+                    id = "av_frame_guide",
+                    titleRes = R.string.feature_av_frame_title,
+                    summaryRes = R.string.feature_av_frame_summary,
+                    destination = FeatureDestination.AvFrameGuide
                 ),
                 FeatureItem(
                     id = "movie_prober",
@@ -90,36 +83,6 @@ object FeatureCatalog {
                     titleRes = R.string.feature_read_packet_title,
                     summaryRes = R.string.feature_read_packet_summary,
                     destination = FeatureDestination.Detail("read_packet")
-                ),
-                FeatureItem(
-                    id = "h264_encode",
-                    titleRes = R.string.feature_h264_encode_title,
-                    summaryRes = R.string.feature_h264_encode_summary,
-                    destination = FeatureDestination.VideoEncode
-                ),
-                FeatureItem(
-                    id = "video_soft_encode",
-                    titleRes = R.string.feature_video_soft_encode_title,
-                    summaryRes = R.string.feature_video_soft_encode_summary,
-                    destination = FeatureDestination.VideoSoftEncode
-                ),
-                FeatureItem(
-                    id = "h264_profile_level_guide",
-                    titleRes = R.string.feature_h264_profile_level_title,
-                    summaryRes = R.string.feature_h264_profile_level_summary,
-                    destination = FeatureDestination.H264ProfileLevelGuide
-                ),
-                FeatureItem(
-                    id = "h264_stream_analyzer",
-                    titleRes = R.string.feature_h264_analyzer_title,
-                    summaryRes = R.string.feature_h264_analyzer_summary,
-                    destination = FeatureDestination.H264StreamAnalyzer
-                ),
-                FeatureItem(
-                    id = "h265_stream_analyzer",
-                    titleRes = R.string.feature_h265_analyzer_title,
-                    summaryRes = R.string.feature_h265_analyzer_summary,
-                    destination = FeatureDestination.H265StreamAnalyzer
                 ),
                 FeatureItem(
                     id = "decode_packet",
@@ -173,18 +136,6 @@ object FeatureCatalog {
         FeatureSection(
             titleRes = R.string.section_audio_render,
             items = listOf(
-                FeatureItem(
-                    id = "audio_capture",
-                    titleRes = R.string.feature_audio_capture_title,
-                    summaryRes = R.string.feature_audio_capture_summary,
-                    destination = FeatureDestination.AudioCapture
-                ),
-                FeatureItem(
-                    id = "aac_encode",
-                    titleRes = R.string.feature_aac_encode_title,
-                    summaryRes = R.string.feature_aac_encode_summary,
-                    destination = FeatureDestination.AacEncode
-                ),
                 FeatureItem(
                     id = "audio_unit",
                     titleRes = R.string.feature_audio_unit_title,

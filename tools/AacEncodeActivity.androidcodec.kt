@@ -1,4 +1,4 @@
-package com.lovelymaple.ffmpegavtutorial.audio
+package com.lovelymaple.codec.audio
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -17,10 +17,10 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import com.lovelymaple.ffmpegavtutorial.R
-import com.lovelymaple.ffmpegavtutorial.databinding.ActivityAacEncodeBinding
-import com.lovelymaple.ffmpegavtutorial.ui.setupNavigationBarSpace
-import com.lovelymaple.ffmpegavtutorial.ui.setupStatusBarSpace
+import com.lovelymaple.codec.R
+import com.lovelymaple.codec.databinding.ActivityAacEncodeBinding
+import com.lovelymaple.codec.ui.setupNavigationBarSpace
+import com.lovelymaple.codec.ui.setupStatusBarSpace
 import io.ffmpegtutotial.player.internal.NativeInstance
 import java.io.File
 import java.io.FileOutputStream
@@ -297,16 +297,12 @@ class AacEncodeActivity : AppCompatActivity() {
             return
         }
 
-        var stream: FileOutputStream? = null
         mediaCodec = codec
         try {
-            stream = FileOutputStream(file)
-            outputStream = stream
-
+            outputStream = FileOutputStream(file)
             val pcmBuffer = ByteArray(bufferSizeInBytes)
             val bufferInfo = MediaCodec.BufferInfo()
             var presentationTimeUs = 0L
-            var eosQueued = false
 
             recorder.startRecording()
             postUi {
@@ -319,11 +315,12 @@ class AacEncodeActivity : AppCompatActivity() {
                     val level = calculateLevel(pcmBuffer, read)
                     queueInputBuffer(codec, pcmBuffer, read, presentationTimeUs)
                     presentationTimeUs += bytesToDurationUs(read, sampleRate, channelCount)
-                    val packetDelta = drainEncoder(codec, bufferInfo, stream, profile)
+                    val packetDelta = drainEncoder(codec, bufferInfo, outputStream!!, profile)
                     if (packetDelta < 0) {
                         throw IllegalStateException("MediaCodec drain failed: $packetDelta")
                     }
                     encodedPacketCount += packetDelta
+                    Log.d(TAG, "aac input queued ptsUs=$presentationTimeUs read=$read packets=$encodedPacketCount")
                     postUi {
                         binding.levelProgress.progress = level
                         binding.levelText.text =
@@ -336,14 +333,14 @@ class AacEncodeActivity : AppCompatActivity() {
                 }
             }
 
-            eosQueued = true
             queueEndOfStream(codec, presentationTimeUs)
-            val finalPacketDelta = drainEncoder(codec, bufferInfo, stream, profile, endOfStream = true)
+            val finalPacketDelta =
+                drainEncoder(codec, bufferInfo, outputStream!!, profile, endOfStream = true)
             if (finalPacketDelta < 0) {
                 throw IllegalStateException("MediaCodec final drain failed: $finalPacketDelta")
             }
             encodedPacketCount += finalPacketDelta
-            stream.flush()
+            outputStream?.flush()
         } catch (exception: Exception) {
             postUi {
                 updateStatus(
@@ -355,9 +352,7 @@ class AacEncodeActivity : AppCompatActivity() {
             }
         } finally {
             releaseMediaCodecResources()
-            postUi {
-                finishEncodingUi()
-            }
+            postUi { finishEncodingUi() }
         }
     }
 
@@ -371,7 +366,14 @@ class AacEncodeActivity : AppCompatActivity() {
         val bitrate = currentBitrate.bitrate
         var closeSummary: String? = null
         var nativeOpened = false
+        var writeLoopCount = 0
         try {
+            Log.d(
+                TAG,
+                "soft AAC start sampleRate=$sampleRate channelCount=$channelCount " +
+                    "bitrate=$bitrate profile=${profile.name} bufferSizeInBytes=$bufferSizeInBytes " +
+                    "output=${file.absolutePath}"
+            )
             val openResult = nativeInstance.openSoftAacEncoder(
                 file.absolutePath,
                 sampleRate,
@@ -379,6 +381,7 @@ class AacEncodeActivity : AppCompatActivity() {
                 bitrate,
                 profile.ffmpegProfile
             )
+            Log.d(TAG, "openSoftAacEncoder result=$openResult")
             if (!openResult.startsWith("OK:")) {
                 throw IllegalStateException(openResult)
             }
@@ -393,12 +396,26 @@ class AacEncodeActivity : AppCompatActivity() {
             while (isEncoding) {
                 val read = recorder.read(pcmBuffer, 0, pcmBuffer.size)
                 if (read > 0) {
+                    writeLoopCount += 1
                     val level = calculateLevel(pcmBuffer, read)
                     val packetDelta = nativeInstance.writeSoftAacPcm(pcmBuffer, read)
                     if (packetDelta < 0) {
                         throw IllegalStateException("FFmpeg soft AAC write failed: $packetDelta")
                     }
                     encodedPacketCount += packetDelta
+                    if (writeLoopCount <= 6 || writeLoopCount % 20 == 0 || packetDelta > 0) {
+                        val firstSample = if (read >= 2) {
+                            (((pcmBuffer[1].toInt()) shl 8) or (pcmBuffer[0].toInt() and 0xFF)).toShort().toInt()
+                        } else {
+                            0
+                        }
+                        Log.d(
+                            TAG,
+                            "soft AAC input loop=$writeLoopCount read=$read level=$level " +
+                                "firstSample=$firstSample packetDelta=$packetDelta " +
+                                "totalPackets=$encodedPacketCount"
+                        )
+                    }
                     postUi {
                         binding.levelProgress.progress = level
                         binding.levelText.text =
@@ -411,6 +428,7 @@ class AacEncodeActivity : AppCompatActivity() {
                 }
             }
         } catch (exception: Exception) {
+            Log.e(TAG, "soft AAC encode failed", exception)
             postUi {
                 updateStatus(
                     getString(
@@ -422,6 +440,7 @@ class AacEncodeActivity : AppCompatActivity() {
         } finally {
             if (nativeOpened) {
                 closeSummary = nativeInstance.closeSoftAacEncoder()
+                Log.d(TAG, "closeSoftAacEncoder result=$closeSummary")
                 updatePacketCountFromSummary(closeSummary)
             }
             releaseAudioRecord()
@@ -481,9 +500,7 @@ class AacEncodeActivity : AppCompatActivity() {
         while (true) {
             val outputIndex = codec.dequeueOutputBuffer(bufferInfo, if (endOfStream) 10_000 else 0)
             when {
-                outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                    return emittedPackets
-                }
+                outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> return emittedPackets
                 outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     Log.d(TAG, "AAC output format changed: ${codec.outputFormat}")
                 }
@@ -499,9 +516,7 @@ class AacEncodeActivity : AppCompatActivity() {
                             "size=${bufferInfo.size} offset=${bufferInfo.offset} " +
                             "flags=${bufferInfo.flags} codecConfig=$isCodecConfig eos=$isEndOfStream"
                     )
-                    if (bufferInfo.size > 0 &&
-                        bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0
-                    ) {
+                    if (bufferInfo.size > 0 && !isCodecConfig) {
                         outputBuffer.position(bufferInfo.offset)
                         outputBuffer.limit(bufferInfo.offset + bufferInfo.size)
                         val packet = ByteArray(bufferInfo.size)
@@ -530,19 +545,14 @@ class AacEncodeActivity : AppCompatActivity() {
         val channelCount = currentChannel.channelCount
         val packetLength = dataLength + 7
         val adtsHeader = ByteArray(7)
-        val adtsProfile = when (profile) {
-            AacProfileOption.LC -> 2
-            AacProfileOption.HE, AacProfileOption.HE_V2 -> 2
-        }
+        val adtsProfile = 2
         val frequencyIndex = aacSampleRateIndex(sampleRate)
-        val channelConfigForHeader = channelCount
 
         adtsHeader[0] = 0xFF.toByte()
         adtsHeader[1] = 0xF9.toByte()
         adtsHeader[2] =
-            (((adtsProfile - 1) shl 6) + (frequencyIndex shl 2) + (channelConfigForHeader shr 2)).toByte()
-        adtsHeader[3] =
-            (((channelConfigForHeader and 3) shl 6) + (packetLength shr 11)).toByte()
+            (((adtsProfile - 1) shl 6) + (frequencyIndex shl 2) + (channelCount shr 2)).toByte()
+        adtsHeader[3] = (((channelCount and 3) shl 6) + (packetLength shr 11)).toByte()
         adtsHeader[4] = ((packetLength and 0x7FF) shr 3).toByte()
         adtsHeader[5] = (((packetLength and 7) shl 5) + 0x1F).toByte()
         adtsHeader[6] = 0xFC.toByte()
@@ -663,7 +673,7 @@ class AacEncodeActivity : AppCompatActivity() {
         binding.outputPathText.text =
             getString(
                 R.string.aac_encode_output_path_value,
-                getString(R.string.h264_encode_output_path_empty)
+                getString(R.string.audio_capture_file_path_empty)
             )
         binding.probeInfoText.text = getString(R.string.aac_encode_probe_empty)
         binding.levelText.text =
@@ -762,26 +772,33 @@ class AacEncodeActivity : AppCompatActivity() {
                 )
 
             val mime = trackFormat.getString(MediaFormat.KEY_MIME) ?: "unknown"
-            val sampleRate = trackFormat.getIntegerSafely(MediaFormat.KEY_SAMPLE_RATE)
-            val channelCount = trackFormat.getIntegerSafely(MediaFormat.KEY_CHANNEL_COUNT)
-            val metadataBitrate = trackFormat.getIntegerSafely(MediaFormat.KEY_BIT_RATE)
-            val durationUs = trackFormat.getLongSafely(MediaFormat.KEY_DURATION)
+            val sampleRate = if (trackFormat.containsKey(MediaFormat.KEY_SAMPLE_RATE)) {
+                trackFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+            } else {
+                0
+            }
+            val channelCount = if (trackFormat.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
+                trackFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+            } else {
+                0
+            }
+            val metadataBitrate = if (trackFormat.containsKey(MediaFormat.KEY_BIT_RATE)) {
+                trackFormat.getInteger(MediaFormat.KEY_BIT_RATE)
+            } else {
+                0
+            }
+            val durationUs = if (trackFormat.containsKey(MediaFormat.KEY_DURATION)) {
+                trackFormat.getLong(MediaFormat.KEY_DURATION)
+            } else {
+                0L
+            }
             val averageBitrate = estimateAverageBitrate(file.length(), durationUs)
 
             listOf(
                 getString(R.string.aac_encode_probe_mode_value, mime),
-                getString(
-                    R.string.aac_encode_probe_duration_value,
-                    formatDuration(durationUs)
-                ),
-                getString(
-                    R.string.aac_encode_probe_sample_rate_value,
-                    sampleRate
-                ),
-                getString(
-                    R.string.aac_encode_probe_channel_value,
-                    channelCount
-                ),
+                getString(R.string.aac_encode_probe_duration_value, formatDuration(durationUs)),
+                getString(R.string.aac_encode_probe_sample_rate_value, sampleRate),
+                getString(R.string.aac_encode_probe_channel_value, channelCount),
                 getString(
                     R.string.aac_encode_probe_target_bitrate_value,
                     formatBitrate(currentBitrate.bitrate)
@@ -800,10 +817,7 @@ class AacEncodeActivity : AppCompatActivity() {
                 )
             ).joinToString(separator = "\n")
         } catch (exception: Exception) {
-            getString(
-                R.string.aac_encode_probe_failed,
-                exception.message ?: "unknown error"
-            )
+            getString(R.string.aac_encode_probe_failed, exception.message ?: "unknown error")
         } finally {
             try {
                 extractor.release()
@@ -823,12 +837,9 @@ class AacEncodeActivity : AppCompatActivity() {
         return null
     }
 
-    private fun MediaFormat.getIntegerSafely(key: String): Int {
-        return if (containsKey(key)) getInteger(key) else 0
-    }
-
-    private fun MediaFormat.getLongSafely(key: String): Long {
-        return if (containsKey(key)) getLong(key) else 0L
+    private fun estimateAverageBitrate(fileSizeBytes: Long, durationUs: Long): Int {
+        if (fileSizeBytes <= 0L || durationUs <= 0L) return 0
+        return ((fileSizeBytes * 8_000_000L) / durationUs).toInt()
     }
 
     private fun formatDuration(durationUs: Long): String {
@@ -838,11 +849,6 @@ class AacEncodeActivity : AppCompatActivity() {
         val seconds = (totalMs % 60_000L) / 1000L
         val millis = totalMs % 1000L
         return String.format(Locale.US, "%02d:%02d.%03d", minutes, seconds, millis)
-    }
-
-    private fun estimateAverageBitrate(fileSizeBytes: Long, durationUs: Long): Int {
-        if (fileSizeBytes <= 0L || durationUs <= 0L) return 0
-        return ((fileSizeBytes * 8_000_000L) / durationUs).toInt()
     }
 
     private fun formatBitrate(bitrate: Int): String {

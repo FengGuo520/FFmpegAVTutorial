@@ -745,7 +745,7 @@ class LiveFlvMuxActivity : AppCompatActivity() {
         ptsUs: Long,
         flags: Int
     ) {
-        val normalizedPtsUs = normalizePtsUs(isVideo, ptsUs)
+        val normalizedPtsUs = normalizePtsUs(isVideo, ptsUs)   //这里时间戳 的归一化操作
         synchronized(muxerLock) {
             if (!muxerStarted) {
                 pendingPackets.add(PendingPacket(isVideo, data, normalizedPtsUs, flags))
