@@ -4,7 +4,7 @@
     <string name="feature_chevron">›</string>
     <string name="back_arrow">←</string>
 
-    <string name="section_basic">一、音视频基础</string>
+    <string name="section_basic">FF基础</string>
     <string name="section_video_render">二、视频渲染</string>
     <string name="section_audio_render">三、音频渲染</string>
     <string name="section_mux_container">四、封装和容器</string>

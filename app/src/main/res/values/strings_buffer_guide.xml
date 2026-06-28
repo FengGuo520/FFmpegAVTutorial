@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_buffer_guide_title">Buffer Guide</string>
+    <string name="feature_buffer_guide_summary">集中学习 AVBuffer、AVPacket、AVFrame 的引用计数、所有权转移和 copy-on-write。</string>
+    <string name="buffer_guide_page_title">Buffer Guide</string>
+    <string name="buffer_guide_section_title">选择要学习的结构体</string>
+</resources>

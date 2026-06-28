@@ -18,7 +18,9 @@ data class FeatureItem(
 sealed interface FeatureDestination {
     data object FFmpegInfo : FeatureDestination
     data object AvRationalGuide : FeatureDestination
+    data object BufferGuide : FeatureDestination
     data object AvBufferGuide : FeatureDestination
+    data object AvPacketGuide : FeatureDestination
     data object AvFrameGuide : FeatureDestination
     data object FlvMux : FeatureDestination
     data object LiveFlvMux : FeatureDestination
@@ -61,16 +63,10 @@ object FeatureCatalog {
                     destination = FeatureDestination.AvRationalGuide
                 ),
                 FeatureItem(
-                    id = "av_buffer_guide",
-                    titleRes = R.string.feature_av_buffer_title,
-                    summaryRes = R.string.feature_av_buffer_summary,
-                    destination = FeatureDestination.AvBufferGuide
-                ),
-                FeatureItem(
-                    id = "av_frame_guide",
-                    titleRes = R.string.feature_av_frame_title,
-                    summaryRes = R.string.feature_av_frame_summary,
-                    destination = FeatureDestination.AvFrameGuide
+                    id = "buffer_guide",
+                    titleRes = R.string.feature_buffer_guide_title,
+                    summaryRes = R.string.feature_buffer_guide_summary,
+                    destination = FeatureDestination.BufferGuide
                 ),
                 FeatureItem(
                     id = "movie_prober",

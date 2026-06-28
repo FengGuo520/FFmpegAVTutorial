@@ -18,7 +18,13 @@
             android:name=".basic.AvFrameGuideActivity"
             android:exported="false" />
         <activity
+            android:name=".basic.BufferGuideActivity"
+            android:exported="false" />
+        <activity
             android:name=".basic.AvBufferGuideActivity"
+            android:exported="false" />
+        <activity
+            android:name=".basic.AvPacketGuideActivity"
             android:exported="false" />
         <activity
             android:name=".basic.AvRationalGuideActivity"

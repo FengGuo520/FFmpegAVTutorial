@@ -28,7 +28,11 @@ public class NativeInstance {
 
     public native void runAvBufferDemo(long nativePtr);
 
+    public native void runAvPacketDemo(long nativePtr);
+
     public native void runAvFrameDemo(long nativePtr);
+
+    public native void runFrameQueueDemo(long nativePtr);
 
     public native String muxToFlv(long nativePtr, String videoPath, String audioPath, String outputPath);
 
@@ -69,8 +73,16 @@ public class NativeInstance {
         runAvBufferDemo(nativePtr);
     }
 
+    public void runAvPacketDemo() {
+        runAvPacketDemo(nativePtr);
+    }
+
     public void runAvFrameDemo() {
         runAvFrameDemo(nativePtr);
+    }
+
+    public void runFrameQueueDemo() {
+        runFrameQueueDemo(nativePtr);
     }
 
     public String muxToFlv(String videoPath, String audioPath, String outputPath) {

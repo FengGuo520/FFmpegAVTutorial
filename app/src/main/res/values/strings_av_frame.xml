@@ -20,8 +20,15 @@
 
     <string name="av_frame_native_demo_title">Native Frame Demo</string>
     <string name="av_frame_refresh">刷新 Native 演示</string>
+    <string name="av_frame_queue_demo_title">FrameQueue Demo</string>
+    <string name="av_frame_queue_refresh">运行 FrameQueue 演示</string>
     <string name="av_frame_status_loading">正在执行 native AVFrame 演示，并输出到 Logcat...</string>
     <string name="av_frame_status_ready">执行完成，请到 Logcat 查看 tag 为 AVFrameDemo 的详细 frame/buffer 关系和 copy-on-write 步骤。</string>
     <string name="av_frame_status_error">Native 演示加载失败：%1$s</string>
     <string name="av_frame_log_hint">这个区域不展示 native 返回文本。点击上方按钮后，请直接在 Logcat 中查看 tag 为 AVFrameDemo 的日志输出，里面会按步骤打印 AVFrame 的元信息、plane 地址、buf[0] 引用计数，以及 clone、make_writable、unref、free 的过程。</string>
+    <string name="av_frame_queue_status_loading">正在执行 ffplay 风格 FrameQueue 演示，并输出到 Logcat...</string>
+    <string name="av_frame_queue_status_idle">点击按钮运行 ffplay 风格 FrameQueue 演示。</string>
+    <string name="av_frame_queue_status_ready">执行完成，请到 Logcat 查看 tag 为 FrameQueueDemo 的详细 rindex/windex/keep_last/move_ref/unref 步骤。</string>
+    <string name="av_frame_queue_status_error">FrameQueue 演示加载失败：%1$s</string>
+    <string name="av_frame_queue_log_hint">这个演示仿照 ffplay 的 FrameQueue：固定数组保存可复用 AVFrame 外壳，生产者用 av_frame_move_ref 把解码结果移入槽位，消费者用 frame_queue_next 释放已显示帧的 buffer 引用。重点观察 keep_last 第一次 next 只标记 shown，不立刻 unref。</string>
 </resources>

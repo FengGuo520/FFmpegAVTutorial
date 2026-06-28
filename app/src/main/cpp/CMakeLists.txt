@@ -75,7 +75,9 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         NativeLog.cpp
         AVRationalDemo.cpp
         AVBufferDemo.cpp
+        AVPacketDemo.cpp
         AVFrameDemo.cpp
+        FrameQueueDemo.cpp
         AVEngine.cpp)
 
 # Specifies libraries CMake should link to your target library. You

@@ -6,7 +6,9 @@ import android.view.LayoutInflater
 import androidx.appcompat.app.AppCompatActivity
 import com.lovelymaple.ffmpegavtutorial.basic.AvBufferGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.AvFrameGuideActivity
+import com.lovelymaple.ffmpegavtutorial.basic.AvPacketGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.AvRationalGuideActivity
+import com.lovelymaple.ffmpegavtutorial.basic.BufferGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.FFmpegInfoActivity
 import com.lovelymaple.ffmpegavtutorial.container.FlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.LiveFlvMuxActivity
@@ -53,8 +55,14 @@ class MainActivity : AppCompatActivity() {
                         FeatureDestination.AvRationalGuide -> {
                             startActivity(Intent(this, AvRationalGuideActivity::class.java))
                         }
+                        FeatureDestination.BufferGuide -> {
+                            startActivity(Intent(this, BufferGuideActivity::class.java))
+                        }
                         FeatureDestination.AvBufferGuide -> {
                             startActivity(Intent(this, AvBufferGuideActivity::class.java))
+                        }
+                        FeatureDestination.AvPacketGuide -> {
+                            startActivity(Intent(this, AvPacketGuideActivity::class.java))
                         }
                         FeatureDestination.AvFrameGuide -> {
                             startActivity(Intent(this, AvFrameGuideActivity::class.java))

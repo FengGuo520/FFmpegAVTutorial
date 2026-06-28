@@ -26,6 +26,8 @@ class AvFrameGuideActivity : AppCompatActivity() {
 
         nativeInstance = NativeInstance.getSharedInstance() ?: NativeInstance()
         binding.refreshButton.setOnClickListener { runNativeDemo() }
+        binding.queueRefreshButton.setOnClickListener { runFrameQueueDemo() }
+        binding.queueStatusText.text = getString(R.string.av_frame_queue_status_idle)
         runNativeDemo()
     }
 
@@ -42,6 +44,22 @@ class AvFrameGuideActivity : AppCompatActivity() {
             )
         } finally {
             binding.refreshButton.isEnabled = true
+        }
+    }
+
+    private fun runFrameQueueDemo() {
+        binding.queueStatusText.text = getString(R.string.av_frame_queue_status_loading)
+        binding.queueRefreshButton.isEnabled = false
+        try {
+            nativeInstance.runFrameQueueDemo()
+            binding.queueStatusText.text = getString(R.string.av_frame_queue_status_ready)
+        } catch (t: Throwable) {
+            binding.queueStatusText.text = getString(
+                R.string.av_frame_queue_status_error,
+                t.message ?: t.javaClass.simpleName
+            )
+        } finally {
+            binding.queueRefreshButton.isEnabled = true
         }
     }
 }

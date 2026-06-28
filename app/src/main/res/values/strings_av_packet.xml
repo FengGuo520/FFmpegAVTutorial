@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_av_packet_title">AVPacket Guide</string>
+    <string name="feature_av_packet_summary">介绍 FFmpeg 的 AVPacket：压缩包数据、时间戳、引用计数、side data，以及 demux/decoder/mux 链路里的常用 API。</string>
+
+    <string name="av_packet_page_title">AVPacket Guide</string>
+    <string name="av_packet_badge">FFmpeg Packet</string>
+    <string name="av_packet_back_arrow">←</string>
+    <string name="av_packet_headline">理解 AVPacket，要先把“压缩数据包”和“时间戳单位”分开看</string>
+    <string name="av_packet_description">AVPacket 是 FFmpeg 里承载压缩媒体数据的核心结构。demux 从容器里读出 AVPacket，解码器吃 AVPacket 输出 AVFrame；编码器吃 AVFrame 输出 AVPacket，muxer 再把 AVPacket 写回容器。它和 AVFrame 最大的区别是：AVPacket 里通常是 H.264、AAC、HEVC 这类压缩后的码流片段，而 AVFrame 里是解码后的原始音视频数据。</string>
+
+    <string name="av_packet_role_title">AVPacket 的角色与作用</string>
+    <string name="av_packet_role_body">可以把 AVPacket 理解成“某一路媒体流中的一段压缩数据 + 这段数据的播放时序信息”。它保存 data、size、stream_index、pts、dts、duration、flags、pos、side_data 等字段。data/size 指向真正的压缩 payload；pts/dts/duration 负责同步和排序；stream_index 表示它属于哪个音视频流；flags 常用来标记关键帧。</string>
+
+    <string name="av_packet_fields_title">学习时最值得先盯住的字段</string>
+    <string name="av_packet_fields_body">常看字段：data、size、buf、pts、dts、duration、stream_index、flags、pos、side_data。buf 是 AVBufferRef，表示 packet payload 是否由 FFmpeg 引用计数系统托管。只要 packet 是 refcounted，就可以通过 av_packet_ref/clone 共享底层数据，并在 av_packet_make_writable 时触发 copy-on-write。</string>
+
+    <string name="av_packet_api_title">常用基础 API</string>
+    <string name="av_packet_api_body">基础链路通常是：av_packet_alloc 创建空 packet；av_new_packet 分配 payload；av_packet_ref 或 av_packet_clone 共享 packet；av_packet_make_writable 确保可写；av_packet_move_ref 转移所有权；av_packet_rescale_ts 在不同 time_base 之间转换 pts/dts/duration；av_packet_unref 清空当前持有的数据引用；av_packet_free 释放 packet 外壳。真实工程里，av_read_frame、avcodec_send_packet、avcodec_receive_packet、av_interleaved_write_frame 也都围绕 AVPacket 展开。</string>
+
+    <string name="av_packet_native_demo_title">Native Packet Demo</string>
+    <string name="av_packet_refresh">运行 AVPacket 演示</string>
+    <string name="av_packet_status_loading">正在执行 native AVPacket 演示，并输出到 Logcat...</string>
+    <string name="av_packet_status_ready">执行完成，请到 Logcat 查看 tag 为 AVPacketDemo 的 payload、side data、ref/clone/move_ref/copy-on-write/rescale_ts 步骤。</string>
+    <string name="av_packet_status_error">AVPacket 演示加载失败：%1$s</string>
+    <string name="av_packet_log_hint">这个区域不展示 native 返回文本。点击按钮后，请在 Logcat 中查看 tag 为 AVPacketDemo 的日志输出。重点观察 av_packet_ref 后 refCount 增加，av_packet_make_writable 后共享 payload 分裂，以及 av_packet_move_ref 后源 packet 被清空。</string>
+</resources>
