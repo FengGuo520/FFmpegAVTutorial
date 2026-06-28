@@ -16,7 +16,7 @@
     <string name="feature_custom_thread_title">Custom Thread</string>
     <string name="feature_custom_thread_summary">封装线程能力，方便后续调度解码和渲染任务</string>
     <string name="feature_movie_prober_title">Movie Prober</string>
-    <string name="feature_movie_prober_summary">查看音视频流、时长、码率和轨道信息</string>
+    <string name="feature_movie_prober_summary">选择本地 mp4/flv 等文件，学习解封装并查看时长、码率、轨道和编码信息</string>
     <string name="feature_read_packet_title">Read Packet</string>
     <string name="feature_read_packet_summary">读取音视频包，观察 demux 阶段输出</string>
     <string name="feature_decode_packet_title">Decode Packet</string>

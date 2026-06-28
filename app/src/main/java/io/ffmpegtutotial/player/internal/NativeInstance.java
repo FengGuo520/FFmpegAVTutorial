@@ -24,6 +24,8 @@ public class NativeInstance {
 
     public native String getInfo(long nativePtr);
 
+    public native String probeMediaFile(long nativePtr, String mediaPath);
+
     public native void runAvRationalDemo(long nativePtr);
 
     public native void runAvBufferDemo(long nativePtr);
@@ -63,6 +65,10 @@ public class NativeInstance {
 
     public String getInfo() {
         return getInfo(nativePtr);
+    }
+
+    public String probeMediaFile(String mediaPath) {
+        return probeMediaFile(nativePtr, mediaPath);
     }
 
     public void runAvRationalDemo() {

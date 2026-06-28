@@ -22,6 +22,7 @@ sealed interface FeatureDestination {
     data object AvBufferGuide : FeatureDestination
     data object AvPacketGuide : FeatureDestination
     data object AvFrameGuide : FeatureDestination
+    data object MovieProber : FeatureDestination
     data object FlvMux : FeatureDestination
     data object LiveFlvMux : FeatureDestination
     data object RtmpPush : FeatureDestination
@@ -72,7 +73,7 @@ object FeatureCatalog {
                     id = "movie_prober",
                     titleRes = R.string.feature_movie_prober_title,
                     summaryRes = R.string.feature_movie_prober_summary,
-                    destination = FeatureDestination.Detail("movie_prober")
+                    destination = FeatureDestination.MovieProber
                 ),
                 FeatureItem(
                     id = "read_packet",

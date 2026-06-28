@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="movie_prober_page_title">Movie Prober</string>
+    <string name="movie_prober_badge">libavformat demux</string>
+    <string name="movie_prober_headline">探测本地媒体文件的容器与轨道信息</string>
+    <string name="movie_prober_description">选择 mp4、flv、mkv、aac、mp3 等本地文件，native 层使用 avformat_open_input、avformat_find_stream_info 和 av_read_frame 展示解封装结果。</string>
+    <string name="movie_prober_select_file">选择本地文件</string>
+    <string name="movie_prober_analyze">开始探测</string>
+    <string name="movie_prober_snapshot_title">Selected Input</string>
+    <string name="movie_prober_result_title">Demux Result</string>
+    <string name="movie_prober_selected_file_value">Selected file: %1$s</string>
+    <string name="movie_prober_source_uri_value">Source URI: %1$s</string>
+    <string name="movie_prober_local_copy_value">Local copy: %1$s</string>
+    <string name="movie_prober_empty_value">Not selected yet</string>
+    <string name="movie_prober_result_empty">Probe result will appear here after selecting a file.</string>
+    <string name="movie_prober_status_idle">Ready to select a local media file.</string>
+    <string name="movie_prober_status_importing">Importing the selected file into app storage.</string>
+    <string name="movie_prober_status_ready">Ready to probe: %1$s</string>
+    <string name="movie_prober_status_select_file_first">Select a local media file first.</string>
+    <string name="movie_prober_status_analyzing">Probing media file: %1$s</string>
+    <string name="movie_prober_status_done">Media probe finished: %1$s</string>
+    <string name="movie_prober_status_error">Media probe failed: %1$s</string>
+</resources>

@@ -30,6 +30,9 @@
             android:name=".basic.AvRationalGuideActivity"
             android:exported="false" />
         <activity
+            android:name=".basic.MovieProberActivity"
+            android:exported="false" />
+        <activity
             android:name=".container.RtmpPushActivity"
             android:exported="false" />
         <activity
