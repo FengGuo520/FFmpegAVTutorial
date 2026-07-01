@@ -92,6 +92,30 @@ std::string CodecName(const AVCodecParameters *parameters) {
     return oss.str();
 }
 
+void LogLongTextByChunk(const char *tag, const std::string &title, const std::string &text, size_t chunkSize = 1800) {
+    NATIVE_LOGI_TAG(tag, "%s begin", title.c_str());
+    if (text.empty()) {
+        NATIVE_LOGI_TAG(tag, "%s <empty>", title.c_str());
+        NATIVE_LOGI_TAG(tag, "%s end", title.c_str());
+        return;
+    }
+
+    size_t offset = 0;
+    int chunkIndex = 0;
+    while (offset < text.size()) {
+        size_t length = std::min(chunkSize, text.size() - offset);
+        size_t breakPos = text.rfind('\n', offset + length);
+        if (breakPos != std::string::npos && breakPos >= offset && breakPos < offset + length) {
+            length = breakPos - offset + 1;
+        }
+        const std::string chunk = text.substr(offset, length);
+        NATIVE_LOGI_TAG(tag, "%s chunk#%d:\n%s", title.c_str(), chunkIndex, chunk.c_str());
+        offset += length;
+        chunkIndex++;
+    }
+    NATIVE_LOGI_TAG(tag, "%s end totalChunks=%d", title.c_str(), chunkIndex);
+}
+
 void AppendMetadata(std::ostringstream &oss, const AVDictionary *metadata, const char *indent) {
     const AVDictionaryEntry *entry = nullptr;
     int count = 0;
@@ -197,8 +221,7 @@ void AppendPacketSamples(std::ostringstream &oss, AVFormatContext *formatContext
             break;
         }
 
-        AVStream *stream = packet->stream_index >= 0 &&
-            packet->stream_index < static_cast<int>(formatContext->nb_streams)
+        AVStream *stream = packet->stream_index >= 0 && packet->stream_index < static_cast<int>(formatContext->nb_streams)
             ? formatContext->streams[packet->stream_index]
             : nullptr;
         AVRational timeBase = stream != nullptr ? stream->time_base : AVRational{1, AV_TIME_BASE};
@@ -206,21 +229,22 @@ void AppendPacketSamples(std::ostringstream &oss, AVFormatContext *formatContext
             ? MediaTypeName(stream->codecpar->codec_type)
             : "unknown";
 
-        oss << "packet #" << count
-            << " stream=" << packet->stream_index
-            << " type=" << typeName
-            << " size=" << packet->size
-            << " pts=" << packet->pts
-            << " (" << FormatDurationSeconds(packet->pts, timeBase) << ")"
-            << " dts=" << packet->dts
-            << " (" << FormatDurationSeconds(packet->dts, timeBase) << ")"
-            << " duration=" << packet->duration
-            << " (" << FormatDurationSeconds(packet->duration, timeBase) << ")"
-            << " flags=0x" << std::hex << packet->flags << std::dec;
+        std::ostringstream line;
+        line << "packet #" << count
+             << " stream=" << packet->stream_index
+             << " type=" << typeName
+             << " size=" << packet->size
+             << " pts=" << packet->pts
+             << " (" << FormatDurationSeconds(packet->pts, timeBase) << ")"
+             << " dts=" << packet->dts
+             << " (" << FormatDurationSeconds(packet->dts, timeBase) << ")"
+             << " duration=" << packet->duration
+             << " (" << FormatDurationSeconds(packet->duration, timeBase) << ")"
+             << " flags=0x" << std::hex << packet->flags << std::dec;
         if ((packet->flags & AV_PKT_FLAG_KEY) != 0) {
-            oss << " key";
+            line << " key";
         }
-        oss << '\n';
+        oss << line.str() << '\n';
 
         av_packet_unref(packet);
         count++;
@@ -271,7 +295,7 @@ std::string ProbeMediaFile(const char *path) {
     AppendPacketSamples(oss, formatContext);
 
     std::string resultText = oss.str();
-    NATIVE_LOGI_TAG("MediaProbeDemo", "probe result:\n%s", resultText.c_str());
+    LogLongTextByChunk("MediaProbeDemo", "probe result", resultText);
     avformat_close_input(&formatContext);
     return resultText;
 }

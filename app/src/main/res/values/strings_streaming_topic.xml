@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="section_streaming_media">流媒体专题</string>
+    <string name="feature_streaming_topic_title">Streaming Topic</string>
+    <string name="feature_streaming_topic_summary">研究 HLS 的 master/media playlist、变体流、ts/fMP4 分片、EXTINF、live/vod 与首包耗时。</string>
+
+    <string name="streaming_topic_page_title">Streaming Topic</string>
+    <string name="streaming_topic_badge">HLS / Streaming</string>
+    <string name="streaming_topic_back_arrow">←</string>
+    <string name="streaming_topic_headline">把流媒体专题单独拆开，专门观察 HLS 播放列表、分片与首包行为</string>
+    <string name="streaming_topic_description">这一页聚焦在线视频流的“播放列表层”和“解封装层”。输入一个 m3u8 地址后，native 会先抓取 playlist 文本，再分析 master playlist / media playlist、变体流信息、TARGETDURATION、EXTINF、分片格式以及 live / vod 差异，最后再用 FFmpeg 的 avformat_open_input 与 av_read_frame 观察实际 demux 到的压缩包。</string>
+    <string name="streaming_topic_focus_title">这页重点会打印什么</string>
+    <string name="streaming_topic_focus_body">1. Root playlist 是 master 还是 media。&#10;2. master playlist 里的 BANDWIDTH、RESOLUTION、CODECS 与变体 URI。&#10;3. media playlist 里的 EXT-X-TARGETDURATION、EXTINF、MEDIA-SEQUENCE、ENDLIST、MAP。&#10;4. 根据 MAP 和分片后缀推断 ts 还是 fMP4。&#10;5. 根据 ENDLIST 与 PLAYLIST-TYPE 判断 live 还是 vod。&#10;6. playlist 抓取耗时、open_input 耗时、find_stream_info 耗时、首个 demux packet 耗时。&#10;7. 实际 demux 出来的前若干个 AVPacket 样本。</string>
+    <string name="streaming_topic_input_title">Online URL Probe</string>
+    <string name="streaming_topic_input_hint">输入 HLS m3u8 地址，例如 https://example.com/live/index.m3u8</string>
+    <string name="streaming_topic_probe">开始探测</string>
+    <string name="streaming_topic_result_title">Streaming Result</string>
+    <string name="streaming_topic_result_empty">Streaming topic result will appear here after probing a URL.</string>
+    <string name="streaming_topic_status_idle">Ready to probe an online HLS URL.</string>
+    <string name="streaming_topic_status_input_required">Please input an HLS URL first.</string>
+    <string name="streaming_topic_status_probing">Probing streaming URL: %1$s</string>
+    <string name="streaming_topic_status_done">Streaming topic probe finished.</string>
+    <string name="streaming_topic_status_error">Streaming topic probe failed: %1$s</string>
+</resources>

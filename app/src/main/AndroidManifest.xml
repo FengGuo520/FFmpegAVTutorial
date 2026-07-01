@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
@@ -31,6 +32,12 @@
             android:exported="false" />
         <activity
             android:name=".basic.MovieProberActivity"
+            android:exported="false" />
+        <activity
+            android:name=".basic.MovieExtractActivity"
+            android:exported="false" />
+        <activity
+            android:name=".basic.StreamingTopicActivity"
             android:exported="false" />
         <activity
             android:name=".container.RtmpPushActivity"

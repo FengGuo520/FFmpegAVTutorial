@@ -10,7 +10,9 @@ import com.lovelymaple.ffmpegavtutorial.basic.AvPacketGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.AvRationalGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.BufferGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.FFmpegInfoActivity
+import com.lovelymaple.ffmpegavtutorial.basic.MovieExtractActivity
 import com.lovelymaple.ffmpegavtutorial.basic.MovieProberActivity
+import com.lovelymaple.ffmpegavtutorial.basic.StreamingTopicActivity
 import com.lovelymaple.ffmpegavtutorial.container.FlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.LiveFlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.RtmpPushActivity
@@ -70,6 +72,12 @@ class MainActivity : AppCompatActivity() {
                         }
                         FeatureDestination.MovieProber -> {
                             startActivity(Intent(this, MovieProberActivity::class.java))
+                        }
+                        FeatureDestination.MovieExtract -> {
+                            startActivity(Intent(this, MovieExtractActivity::class.java))
+                        }
+                        FeatureDestination.StreamingTopic -> {
+                            startActivity(Intent(this, StreamingTopicActivity::class.java))
                         }
                         FeatureDestination.FlvMux -> {
                             startActivity(Intent(this, FlvMuxActivity::class.java))

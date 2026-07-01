@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="movie_extract_page_title">Movie Extract</string>
+    <string name="movie_extract_badge">demux to ES</string>
+    <string name="movie_extract_headline">Extract AAC / H264 / H265 elementary streams from a local media file</string>
+    <string name="movie_extract_description">Select a local media file, copy it into app storage, then let the native FFmpeg pipeline split supported streams and save them as standalone outputs. The current page extracts AAC with ADTS headers, plus H.264 and H.265 Annex B elementary streams.</string>
+    <string name="movie_extract_select_file">Select Local File</string>
+    <string name="movie_extract_start">Start Extract</string>
+    <string name="movie_extract_snapshot_title">Selected Input</string>
+    <string name="movie_extract_result_title">Extraction Result</string>
+    <string name="movie_extract_selected_file_value">Selected file: %1$s</string>
+    <string name="movie_extract_source_uri_value">Source URI: %1$s</string>
+    <string name="movie_extract_local_copy_value">Local copy: %1$s</string>
+    <string name="movie_extract_output_dir_value">Output dir: %1$s</string>
+    <string name="movie_extract_output_format_value">Output format: AAC -> ADTS .aac, H264/H265 -> Annex B elementary stream</string>
+    <string name="movie_extract_empty_value">Not selected yet</string>
+    <string name="movie_extract_result_empty">Extracted output paths and stream statistics will appear here after the task finishes.</string>
+    <string name="movie_extract_status_idle">Ready to choose a local media file for stream extraction.</string>
+    <string name="movie_extract_status_importing">Importing the selected file into app storage.</string>
+    <string name="movie_extract_status_ready">Ready to extract supported streams from: %1$s</string>
+    <string name="movie_extract_status_select_file_first">Select a local media file first.</string>
+    <string name="movie_extract_status_extracting">Extracting AAC / H264 / H265 streams from: %1$s</string>
+    <string name="movie_extract_status_done">Movie extraction finished: %1$s</string>
+    <string name="movie_extract_status_error">Movie extraction failed: %1$s</string>
+</resources>

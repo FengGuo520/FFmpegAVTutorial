@@ -79,6 +79,8 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         AVFrameDemo.cpp
         FrameQueueDemo.cpp
         MediaProbeDemo.cpp
+        MovieExtractDemo.cpp
+        StreamingTopicDemo.cpp
         AVEngine.cpp)
 
 # Specifies libraries CMake should link to your target library. You

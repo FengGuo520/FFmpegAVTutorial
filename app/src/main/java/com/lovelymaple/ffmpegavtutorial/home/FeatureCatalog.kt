@@ -23,6 +23,8 @@ sealed interface FeatureDestination {
     data object AvPacketGuide : FeatureDestination
     data object AvFrameGuide : FeatureDestination
     data object MovieProber : FeatureDestination
+    data object MovieExtract : FeatureDestination
+    data object StreamingTopic : FeatureDestination
     data object FlvMux : FeatureDestination
     data object LiveFlvMux : FeatureDestination
     data object RtmpPush : FeatureDestination
@@ -74,6 +76,12 @@ object FeatureCatalog {
                     titleRes = R.string.feature_movie_prober_title,
                     summaryRes = R.string.feature_movie_prober_summary,
                     destination = FeatureDestination.MovieProber
+                ),
+                FeatureItem(
+                    id = "movie_extract",
+                    titleRes = R.string.feature_movie_extract_title,
+                    summaryRes = R.string.feature_movie_extract_summary,
+                    destination = FeatureDestination.MovieExtract
                 ),
                 FeatureItem(
                     id = "read_packet",
@@ -167,6 +175,17 @@ object FeatureCatalog {
                     titleRes = R.string.feature_rtmp_push_title,
                     summaryRes = R.string.feature_rtmp_push_summary,
                     destination = FeatureDestination.RtmpPush
+                )
+            )
+        ),
+        FeatureSection(
+            titleRes = R.string.section_streaming_media,
+            items = listOf(
+                FeatureItem(
+                    id = "streaming_topic",
+                    titleRes = R.string.feature_streaming_topic_title,
+                    summaryRes = R.string.feature_streaming_topic_summary,
+                    destination = FeatureDestination.StreamingTopic
                 )
             )
         )
