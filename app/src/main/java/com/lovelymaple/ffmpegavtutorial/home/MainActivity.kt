@@ -12,6 +12,7 @@ import com.lovelymaple.ffmpegavtutorial.basic.BufferGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.FFmpegInfoActivity
 import com.lovelymaple.ffmpegavtutorial.basic.MovieExtractActivity
 import com.lovelymaple.ffmpegavtutorial.basic.MovieProberActivity
+import com.lovelymaple.ffmpegavtutorial.basic.NativeAudioTrackPlayerActivity
 import com.lovelymaple.ffmpegavtutorial.basic.StreamingTopicActivity
 import com.lovelymaple.ffmpegavtutorial.container.FlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.LiveFlvMuxActivity
@@ -78,6 +79,9 @@ class MainActivity : AppCompatActivity() {
                         }
                         FeatureDestination.StreamingTopic -> {
                             startActivity(Intent(this, StreamingTopicActivity::class.java))
+                        }
+                        FeatureDestination.NativeAudioTrackPlayer -> {
+                            startActivity(Intent(this, NativeAudioTrackPlayerActivity::class.java))
                         }
                         FeatureDestination.FlvMux -> {
                             startActivity(Intent(this, FlvMuxActivity::class.java))

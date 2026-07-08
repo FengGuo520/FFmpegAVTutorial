@@ -3,11 +3,16 @@ package io.ffmpegtutotial.player.internal;
 
 public class NativeInstance {
 
+    public interface NativeAudioTrackPlayerListener {
+        void onNativeAudioTrackPlayerEvent(String state, String snapshot);
+    }
+
     static {
         System.loadLibrary("ffmpegavtutorial");
     }
 
     private long nativePtr;
+    private NativeAudioTrackPlayerListener nativeAudioTrackPlayerListener;
 
     private static NativeInstance nativeInstance;
 
@@ -29,6 +34,16 @@ public class NativeInstance {
     public native String extractMediaStreams(long nativePtr, String mediaPath, String outputDir);
 
     public native String probeStreamingUrl(long nativePtr, String url);
+
+    public native String startNativeAudioTrackPlayer(long nativePtr, String mediaPath);
+
+    public native String stopNativeAudioTrackPlayer(long nativePtr);
+
+    public native String getNativeAudioTrackPlayerSnapshot(long nativePtr);
+
+    public native String pauseNativeAudioTrackPlayer(long nativePtr);
+
+    public native String resumeNativeAudioTrackPlayer(long nativePtr);
 
     public native void runAvRationalDemo(long nativePtr);
 
@@ -81,6 +96,38 @@ public class NativeInstance {
 
     public String probeStreamingUrl(String url) {
         return probeStreamingUrl(nativePtr, url);
+    }
+
+    public String startNativeAudioTrackPlayer(String mediaPath) {
+        return startNativeAudioTrackPlayer(nativePtr, mediaPath);
+    }
+
+    public String stopNativeAudioTrackPlayer() {
+        return stopNativeAudioTrackPlayer(nativePtr);
+    }
+
+    public String getNativeAudioTrackPlayerSnapshot() {
+        return getNativeAudioTrackPlayerSnapshot(nativePtr);
+    }
+
+    public String pauseNativeAudioTrackPlayer() {
+        return pauseNativeAudioTrackPlayer(nativePtr);
+    }
+
+    public String resumeNativeAudioTrackPlayer() {
+        return resumeNativeAudioTrackPlayer(nativePtr);
+    }
+
+    public void setNativeAudioTrackPlayerListener(NativeAudioTrackPlayerListener listener) {
+        nativeAudioTrackPlayerListener = listener;
+    }
+
+    @SuppressWarnings("unused")
+    private void onNativeAudioTrackPlayerEvent(String state, String snapshot) {
+        NativeAudioTrackPlayerListener listener = nativeAudioTrackPlayerListener;
+        if (listener != null) {
+            listener.onNativeAudioTrackPlayerEvent(state, snapshot);
+        }
     }
 
     public void runAvRationalDemo() {

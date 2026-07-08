@@ -73,6 +73,8 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
         native-lib.cpp
         NativeLog.cpp
+        NativeJniBindings.cpp
+        FfmpegAudioDecoder.cpp
         AVRationalDemo.cpp
         AVBufferDemo.cpp
         AVPacketDemo.cpp
@@ -81,6 +83,8 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         MediaProbeDemo.cpp
         MovieExtractDemo.cpp
         StreamingTopicDemo.cpp
+        NativeAudioTrackPlayer.cpp
+        NativeAudioTrackPlayerDemo.cpp
         AVEngine.cpp)
 
 # Specifies libraries CMake should link to your target library. You

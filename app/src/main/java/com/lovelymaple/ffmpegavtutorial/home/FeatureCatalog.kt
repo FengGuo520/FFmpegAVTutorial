@@ -25,6 +25,7 @@ sealed interface FeatureDestination {
     data object MovieProber : FeatureDestination
     data object MovieExtract : FeatureDestination
     data object StreamingTopic : FeatureDestination
+    data object NativeAudioTrackPlayer : FeatureDestination
     data object FlvMux : FeatureDestination
     data object LiveFlvMux : FeatureDestination
     data object RtmpPush : FeatureDestination
@@ -141,6 +142,12 @@ object FeatureCatalog {
         FeatureSection(
             titleRes = R.string.section_audio_render,
             items = listOf(
+                FeatureItem(
+                    id = "native_audio_track_player",
+                    titleRes = R.string.feature_native_audio_track_player_title,
+                    summaryRes = R.string.feature_native_audio_track_player_summary,
+                    destination = FeatureDestination.NativeAudioTrackPlayer
+                ),
                 FeatureItem(
                     id = "audio_unit",
                     titleRes = R.string.feature_audio_unit_title,

@@ -1,0 +1,32 @@
+<resources>
+    <string name="feature_native_audio_track_player_title">Native AudioTrack Player</string>
+    <string name="feature_native_audio_track_player_summary">Open a local media file, decode only its audio stream with FFmpeg in native code, and render PCM through Android AudioTrack from the native side.</string>
+
+    <string name="native_audio_track_player_page_title">Native AudioTrack Player</string>
+    <string name="native_audio_track_player_badge">Audio Decode + Render</string>
+    <string name="native_audio_track_player_headline">FFmpeg audio decode to Android AudioTrack in native</string>
+    <string name="native_audio_track_player_description">This page intentionally follows an ijkplayer-like split: Java only picks the local file and controls the demo, while the native layer opens the file, decodes the audio stream with FFmpeg, converts it to PCM, and writes it into Android AudioTrack through JNI.</string>
+    <string name="native_audio_track_player_select_file">Select Local File</string>
+    <string name="native_audio_track_player_start">Start Playback</string>
+    <string name="native_audio_track_player_stop">Stop Playback</string>
+    <string name="native_audio_track_player_pause">Pause</string>
+    <string name="native_audio_track_player_resume">Resume</string>
+    <string name="native_audio_track_player_source_title">Selected Source</string>
+    <string name="native_audio_track_player_snapshot_title">Native Runtime Snapshot</string>
+    <string name="native_audio_track_player_snapshot_empty">The native playback snapshot will appear here after you start the demo.</string>
+    <string name="native_audio_track_player_status_idle">Ready to select a local media file and start native audio playback.</string>
+    <string name="native_audio_track_player_status_importing">Importing the selected file into the app sandbox…</string>
+    <string name="native_audio_track_player_status_ready">Local file is ready: %1$s</string>
+    <string name="native_audio_track_player_status_select_file_first">Select a local media file first.</string>
+    <string name="native_audio_track_player_status_starting">Starting native audio playback for %1$s…</string>
+    <string name="native_audio_track_player_status_stopping">Stopping native audio playback…</string>
+    <string name="native_audio_track_player_status_pausing">Pausing native audio playback…</string>
+    <string name="native_audio_track_player_status_resuming">Resuming native audio playback…</string>
+    <string name="native_audio_track_player_status_error">Native audio playback failed: %1$s</string>
+    <string name="native_audio_track_player_status_finished_callback">Native callback: playback reached end of stream.</string>
+    <string name="native_audio_track_player_status_error_callback">Native callback: playback stopped with an error.</string>
+    <string name="native_audio_track_player_selected_file_value">Selected file: %1$s</string>
+    <string name="native_audio_track_player_source_uri_value">Source URI: %1$s</string>
+    <string name="native_audio_track_player_local_copy_value">Local copy: %1$s</string>
+    <string name="native_audio_track_player_empty_value">Not selected yet</string>
+</resources>

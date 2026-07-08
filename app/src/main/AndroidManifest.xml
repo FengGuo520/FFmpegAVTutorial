@@ -40,6 +40,9 @@
             android:name=".basic.StreamingTopicActivity"
             android:exported="false" />
         <activity
+            android:name=".basic.NativeAudioTrackPlayerActivity"
+            android:exported="false" />
+        <activity
             android:name=".container.RtmpPushActivity"
             android:exported="false" />
         <activity
