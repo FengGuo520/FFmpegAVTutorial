@@ -1,13 +1,9 @@
 #include "FfmpegAudioDecoder.h"
 
-#include <sstream>
-#include <utility>
-
 #include "NativeLog.h"
 
 extern "C" {
 #include "libavcodec/avcodec.h"
-#include "libavformat/avformat.h"
 #include "libavutil/avutil.h"
 #include "libavutil/channel_layout.h"
 #include "libavutil/samplefmt.h"
@@ -31,35 +27,25 @@ const char *SafeCString(const char *value, const char *fallback = "-") {
 }  // namespace
 
 struct FfmpegAudioDecoder::Impl {
-    explicit Impl(std::string sourcePath) : inputPath(std::move(sourcePath)) {}
-
     ~Impl() {
         Close();
     }
 
-    std::string Open() {
+    std::string Open(
+        const AudioPacketStreamInfo &packetStreamInfo,
+        const AVCodecParameters *codecParameters,
+        AVRational packetTimeBase
+    ) {
         Close();
 
-        int openResult = avformat_open_input(&formatContext, inputPath.c_str(), nullptr, nullptr);
-        if (openResult < 0) {
-            return std::string("Failed to open the local media file: ") + AvErrorToString(openResult);
+        if (codecParameters == nullptr) {
+            return "The audio packet reader did not expose valid codec parameters.";
         }
 
-        openResult = avformat_find_stream_info(formatContext, nullptr);
-        if (openResult < 0) {
-            return std::string("Failed to read media stream info: ") + AvErrorToString(openResult);
-        }
-
-        audioStreamIndex = av_find_best_stream(formatContext, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
-        if (audioStreamIndex < 0) {
-            return "The selected file does not contain a decodable audio stream.";
-        }
-
-        AVStream *audioStream = formatContext->streams[audioStreamIndex];
-        decoder = avcodec_find_decoder(audioStream->codecpar->codec_id);
+        decoder = avcodec_find_decoder(codecParameters->codec_id);
         if (decoder == nullptr) {
             return std::string("Failed to find a decoder for the selected audio stream codec: ") +
-                SafeCString(avcodec_get_name(audioStream->codecpar->codec_id), "unknown");
+                SafeCString(avcodec_get_name(codecParameters->codec_id), "unknown");
         }
 
         codecContext = avcodec_alloc_context3(decoder);
@@ -67,10 +53,11 @@ struct FfmpegAudioDecoder::Impl {
             return "Failed to allocate the native audio decoder context.";
         }
 
-        openResult = avcodec_parameters_to_context(codecContext, audioStream->codecpar);
+        int openResult = avcodec_parameters_to_context(codecContext, codecParameters);
         if (openResult < 0) {
             return std::string("Failed to copy codec parameters into the decoder context: ") + AvErrorToString(openResult);
         }
+        codecContext->pkt_timebase = packetTimeBase;
 
         openResult = avcodec_open2(codecContext, decoder, nullptr);
         if (openResult < 0) {
@@ -83,16 +70,14 @@ struct FfmpegAudioDecoder::Impl {
             return "Failed to allocate AVPacket or AVFrame for audio decode.";
         }
 
-        streamInfo.containerName = SafeCString(formatContext->iformat != nullptr ? formatContext->iformat->name : nullptr);
+        streamInfo.containerName = packetStreamInfo.containerName;
         streamInfo.codecName = SafeCString(decoder->name);
         streamInfo.sourceSampleRate = codecContext->sample_rate > 0 ? codecContext->sample_rate : 44100;
         streamInfo.sourceChannels = codecContext->ch_layout.nb_channels > 0 ? codecContext->ch_layout.nb_channels : 2;
         streamInfo.sourceSampleFormat = SafeCString(av_get_sample_fmt_name(codecContext->sample_fmt));
         streamInfo.outputSampleRate = streamInfo.sourceSampleRate;
         streamInfo.outputChannels = streamInfo.sourceChannels > 1 ? 2 : 1;
-        streamInfo.durationSec = formatContext->duration > 0
-            ? static_cast<double>(formatContext->duration) / static_cast<double>(AV_TIME_BASE)
-            : -1.0;
+        streamInfo.durationSec = packetStreamInfo.durationSec;
 
         av_channel_layout_default(&outputChannelLayout, streamInfo.outputChannels);
         openResult = swr_alloc_set_opts2(
@@ -115,14 +100,17 @@ struct FfmpegAudioDecoder::Impl {
             return std::string("Failed to initialize the audio resampler: ") + AvErrorToString(openResult);
         }
 
-        packetCount = 0;
         decodedFrameCount = 0;
         flushSent = false;
         opened = true;
         return {};
     }
 
-    AudioDecoderReadResult ReadNextPcmBlock(AudioDecoderPcmBlock *block, std::string *errorMessage) {
+    AudioDecoderReadResult ReadNextPcmBlock(
+        PacketQueue *packetQueue,
+        AudioDecoderPcmBlock *block,
+        std::string *errorMessage
+    ) {
         if (block == nullptr) {
             if (errorMessage != nullptr) {
                 *errorMessage = "ReadNextPcmBlock received a null output block.";
@@ -131,9 +119,9 @@ struct FfmpegAudioDecoder::Impl {
         }
         block->pcmData.clear();
 
-        if (!opened || formatContext == nullptr || codecContext == nullptr || swrContext == nullptr) {
+        if (!opened || codecContext == nullptr || swrContext == nullptr || packetQueue == nullptr) {
             if (errorMessage != nullptr) {
-                *errorMessage = "FFmpeg audio decoder has not been opened.";
+                *errorMessage = "FFmpeg audio decoder has not been opened with a valid packet queue.";
             }
             return AudioDecoderReadResult::Error;
         }
@@ -153,23 +141,11 @@ struct FfmpegAudioDecoder::Impl {
                 return AudioDecoderReadResult::Error;
             }
 
-            if (flushSent) {
-                const int flushReceiveResult = avcodec_send_packet(codecContext, nullptr);
-                if (flushReceiveResult == AVERROR_EOF) {
-                    return AudioDecoderReadResult::Eof;
-                }
-                if (flushReceiveResult < 0 && flushReceiveResult != AVERROR(EAGAIN)) {
-                    if (errorMessage != nullptr) {
-                        *errorMessage = std::string("Failed to flush the audio decoder: ") + AvErrorToString(flushReceiveResult);
-                    }
-                    return AudioDecoderReadResult::Error;
-                }
-            }
-
-            bool packetLoaded = false;
-            while (!packetLoaded) {
-                const int readResult = av_read_frame(formatContext, packet);
-                if (readResult == AVERROR_EOF) {
+            std::string packetError;
+            const PacketQueueReadResult packetReadResult =
+                packetQueue->Read(packet, &packetError);
+            if (packetReadResult == PacketQueueReadResult::Eof) {
+                if (!flushSent) {
                     flushSent = true;
                     const int flushResult = avcodec_send_packet(codecContext, nullptr);
                     if (flushResult < 0 && flushResult != AVERROR_EOF && flushResult != AVERROR(EAGAIN)) {
@@ -178,36 +154,15 @@ struct FfmpegAudioDecoder::Impl {
                         }
                         return AudioDecoderReadResult::Error;
                     }
-                    break;
-                }
-                if (readResult < 0) {
-                    if (errorMessage != nullptr) {
-                        *errorMessage = std::string("Failed while reading the local media file: ") + AvErrorToString(readResult);
-                    }
-                    return AudioDecoderReadResult::Error;
-                }
-                if (packet->stream_index != audioStreamIndex) {
-                    av_packet_unref(packet);
                     continue;
                 }
-
-                packetCount += 1;
-                NATIVE_LOGD_TAG(
-                    kTag,
-                    "input packet index=%lld stream=%d pts=%lld dts=%lld duration=%lld size=%d flags=0x%x",
-                    static_cast<long long>(packetCount - 1),
-                    packet->stream_index,
-                    static_cast<long long>(packet->pts),
-                    static_cast<long long>(packet->dts),
-                    static_cast<long long>(packet->duration),
-                    packet->size,
-                    packet->flags
-                );
-                packetLoaded = true;
+                return AudioDecoderReadResult::Eof;
             }
-
-            if (flushSent && !packetLoaded) {
-                continue;
+            if (packetReadResult == PacketQueueReadResult::Error) {
+                if (errorMessage != nullptr) {
+                    *errorMessage = packetError;
+                }
+                return AudioDecoderReadResult::Error;
             }
 
             const int sendResult = avcodec_send_packet(codecContext, packet);
@@ -318,58 +273,47 @@ struct FfmpegAudioDecoder::Impl {
         if (codecContext != nullptr) {
             avcodec_free_context(&codecContext);
         }
-        if (formatContext != nullptr) {
-            avformat_close_input(&formatContext);
-        }
         decoder = nullptr;
-        audioStreamIndex = -1;
         flushSent = false;
         opened = false;
         streamInfo = AudioDecoderStreamInfo{};
     }
 
-    std::string inputPath;
     AudioDecoderStreamInfo streamInfo{};
-    AVFormatContext *formatContext = nullptr;
     AVCodecContext *codecContext = nullptr;
     const AVCodec *decoder = nullptr;
     SwrContext *swrContext = nullptr;
     AVPacket *packet = nullptr;
     AVFrame *frame = nullptr;
     AVChannelLayout outputChannelLayout{};
-    int audioStreamIndex = -1;
     bool flushSent = false;
     bool opened = false;
-    int64_t packetCount = 0;
     int64_t decodedFrameCount = 0;
 };
 
-FfmpegAudioDecoder::FfmpegAudioDecoder(std::string inputPath)
-    : impl_(std::make_unique<Impl>(std::move(inputPath))) {}
+FfmpegAudioDecoder::FfmpegAudioDecoder()
+    : impl_(std::make_unique<Impl>()) {}
 
 FfmpegAudioDecoder::~FfmpegAudioDecoder() = default;
 
-std::string FfmpegAudioDecoder::Open() {
-    return impl_->Open();
+std::string FfmpegAudioDecoder::Open(
+    const AudioPacketStreamInfo &packetStreamInfo,
+    const AVCodecParameters *codecParameters,
+    AVRational packetTimeBase
+) {
+    return impl_->Open(packetStreamInfo, codecParameters, packetTimeBase);
 }
 
 AudioDecoderReadResult FfmpegAudioDecoder::ReadNextPcmBlock(
+    PacketQueue *packetQueue,
     AudioDecoderPcmBlock *block,
     std::string *errorMessage
 ) {
-    return impl_->ReadNextPcmBlock(block, errorMessage);
-}
-
-const std::string &FfmpegAudioDecoder::GetInputPath() const {
-    return impl_->inputPath;
+    return impl_->ReadNextPcmBlock(packetQueue, block, errorMessage);
 }
 
 const AudioDecoderStreamInfo &FfmpegAudioDecoder::GetStreamInfo() const {
     return impl_->streamInfo;
-}
-
-int64_t FfmpegAudioDecoder::GetPacketCount() const {
-    return impl_->packetCount;
 }
 
 int64_t FfmpegAudioDecoder::GetDecodedFrameCount() const {

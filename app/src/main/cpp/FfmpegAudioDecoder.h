@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "PacketQueue.h"
+#include "PacketReader.h"
+
 enum class AudioDecoderReadResult {
     Block,
     Eof,
@@ -34,15 +37,21 @@ struct AudioDecoderPcmBlock {
 
 class FfmpegAudioDecoder {
 public:
-    explicit FfmpegAudioDecoder(std::string inputPath);
+    FfmpegAudioDecoder();
     ~FfmpegAudioDecoder();
 
-    std::string Open();
-    AudioDecoderReadResult ReadNextPcmBlock(AudioDecoderPcmBlock *block, std::string *errorMessage);
+    std::string Open(
+        const AudioPacketStreamInfo &packetStreamInfo,
+        const AVCodecParameters *codecParameters,
+        AVRational packetTimeBase
+    );
+    AudioDecoderReadResult ReadNextPcmBlock(
+        PacketQueue *packetQueue,
+        AudioDecoderPcmBlock *block,
+        std::string *errorMessage
+    );
 
-    const std::string &GetInputPath() const;
     const AudioDecoderStreamInfo &GetStreamInfo() const;
-    int64_t GetPacketCount() const;
     int64_t GetDecodedFrameCount() const;
 
 private:

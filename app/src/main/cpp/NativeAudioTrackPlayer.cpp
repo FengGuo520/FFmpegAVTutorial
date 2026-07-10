@@ -5,6 +5,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <deque>
 #include <mutex>
 #include <sstream>
 #include <thread>
@@ -12,6 +13,8 @@
 #include <vector>
 
 #include "FfmpegAudioDecoder.h"
+#include "PacketQueue.h"
+#include "PacketReader.h"
 #include "NativeJniBindings.h"
 #include "NativeLog.h"
 
@@ -88,6 +91,13 @@ const char *StateName(PlayerState state) {
     }
 }
 
+enum class PcmQueueReadResult {
+    Block,
+    Eof,
+    Error,
+    Stopped
+};
+
 }  // namespace
 
 struct NativeAudioTrackPlayer::Impl {
@@ -99,7 +109,8 @@ struct NativeAudioTrackPlayer::Impl {
     )
         : javaVm(javaVm),
           inputPath(std::move(sourcePath)),
-          callbackJni{nativeInstance, onEventMethod} {}
+          callbackJni{nativeInstance, onEventMethod},
+          packetQueue(kMaxQueuedAudioPackets) {}
 
     ~Impl() {
         StopInternal(false);
@@ -109,7 +120,7 @@ struct NativeAudioTrackPlayer::Impl {
 
     std::string Start(JNIEnv *env) {
         std::lock_guard<std::mutex> lock(stateMutex);
-        if (worker.joinable()) {
+        if (worker.joinable() || readWorker.joinable() || decodeWorker.joinable()) {
             return SnapshotLocked();
         }
         std::string initError = InitializeAudioTrackJni(env, &audioTrackJni);
@@ -126,7 +137,42 @@ struct NativeAudioTrackPlayer::Impl {
         pauseRequested = false;
         audioTrackPaused = false;
         finishedNaturally = false;
-        worker = std::thread(&Impl::PlaybackThreadMain, this);
+        readerInitCompleted = false;
+        readerOpened = false;
+        decoderInitCompleted = false;
+        decoderOpened = false;
+        decodeFinished = false;
+        decodeFailed = false;
+        readerErrorMessage.clear();
+        decodeErrorMessage.clear();
+        lastError.clear();
+        containerName = "-";
+        codecName = "-";
+        sourceSampleFormat = "-";
+        sourceSampleRate = 0;
+        sourceChannels = 0;
+        outputSampleRate = 0;
+        outputChannels = 0;
+        durationSec = -1.0;
+        packetCount = 0;
+        decodedFrames = 0;
+        writtenBlocks = 0;
+        writtenBytes = 0;
+        queuedBlocks = 0;
+        queuedBytes = 0;
+        if (readerCodecParameters != nullptr) {
+            avcodec_parameters_free(&readerCodecParameters);
+        }
+        readerPacketTimeBase = AVRational{0, 1};
+        readerStreamInfo = AudioPacketStreamInfo{};
+        {
+            std::lock_guard<std::mutex> queueLock(queueMutex);
+            pcmQueue.clear();
+        }
+        packetQueue.Reset();
+        readWorker = std::thread(&Impl::ReadThreadMain, this);       //数据读取线程
+        worker = std::thread(&Impl::PlaybackThreadMain, this);      //播放线程 与 管理线程
+        decodeWorker = std::thread(&Impl::DecodeThreadMain, this);  // 解码重采样 线程
         return SnapshotLocked();
     }
 
@@ -175,11 +221,32 @@ struct NativeAudioTrackPlayer::Impl {
         stopRequested = true;
         pauseRequested = false;
         pauseCondition.notify_all();
+        readerInitCondition.notify_all();
+        decoderInitCondition.notify_all();
+        pcmQueueDataCondition.notify_all();
+        pcmQueueSpaceCondition.notify_all();
+        packetQueue.Stop();
         if (markStoppedState) {
             SetState(PlayerState::Stopping, "Stopping playback and draining native resources.");
         }
+        if (readWorker.joinable()) {
+            readWorker.join();
+        }
+        if (decodeWorker.joinable()) {
+            decodeWorker.join();
+        }
         if (worker.joinable()) {
             worker.join();
+        }
+        {
+            std::lock_guard<std::mutex> queueLock(queueMutex);
+            pcmQueue.clear();
+        }
+        {
+            std::lock_guard<std::mutex> lock(stateMutex);
+            if (readerCodecParameters != nullptr) {
+                avcodec_parameters_free(&readerCodecParameters);
+            }
         }
         if (markStoppedState) {
             std::lock_guard<std::mutex> lock(stateMutex);
@@ -190,6 +257,10 @@ struct NativeAudioTrackPlayer::Impl {
                 state = PlayerState::Stopped;
                 message = "Playback stopped from Java.";
             }
+            queuedBlocks = 0;
+            queuedBytes = 0;
+            readerPacketTimeBase = AVRational{0, 1};
+            readerStreamInfo = AudioPacketStreamInfo{};
         }
     }
 
@@ -256,12 +327,235 @@ struct NativeAudioTrackPlayer::Impl {
         oss << "decoded_frames: " << decodedFrames << '\n';
         oss << "written_blocks: " << writtenBlocks << '\n';
         oss << "written_bytes: " << writtenBytes << '\n';
+        oss << "queued_blocks: " << queuedBlocks << '\n';
+        oss << "queued_bytes: " << queuedBytes << '\n';
+        oss << "packet_queue_count: " << packetQueue.GetQueuedPacketCount() << '\n';
+        oss << "packet_queue_bytes: " << packetQueue.GetQueuedPacketBytes() << '\n';
+        oss << "decoder_opened: " << (decoderOpened ? "true" : "false") << '\n';
+        oss << "decode_finished: " << (decodeFinished ? "true" : "false") << '\n';
         if (!lastError.empty()) {
             oss << "last_error: " << lastError << '\n';
         }
         oss << "stop_requested: " << (stopRequested ? "true" : "false") << '\n';
         oss << "natural_finish: " << (finishedNaturally ? "true" : "false") << '\n';
         return oss.str();
+    }
+
+    void ReadThreadMain() {
+        PacketReader packetReader(inputPath);
+        const std::string readerOpenError = packetReader.Open();
+        if (!readerOpenError.empty()) {
+            {
+                std::lock_guard<std::mutex> lock(stateMutex);
+                readerInitCompleted = true;
+                readerOpened = false;
+                readerErrorMessage = readerOpenError;
+            }
+            readerInitCondition.notify_all();
+            packetQueue.Fail(readerOpenError);
+            return;
+        }
+
+        AVCodecParameters *copiedCodecParameters = avcodec_parameters_alloc();
+        if (copiedCodecParameters == nullptr) {
+            const std::string allocError = "Failed to allocate codec parameters for the packet reader.";
+            {
+                std::lock_guard<std::mutex> lock(stateMutex);
+                readerInitCompleted = true;
+                readerOpened = false;
+                readerErrorMessage = allocError;
+            }
+            readerInitCondition.notify_all();
+            packetQueue.Fail(allocError);
+            return;
+        }
+
+        const int copyResult = avcodec_parameters_copy(
+            copiedCodecParameters,
+            packetReader.GetAudioCodecParameters()
+        );
+        if (copyResult < 0) {
+            const std::string copyError =
+                std::string("Failed to copy codec parameters from packet reader: ") +
+                AvErrorToString(copyResult);
+            avcodec_parameters_free(&copiedCodecParameters);
+            {
+                std::lock_guard<std::mutex> lock(stateMutex);
+                readerInitCompleted = true;
+                readerOpened = false;
+                readerErrorMessage = copyError;
+            }
+            readerInitCondition.notify_all();
+            packetQueue.Fail(copyError);
+            return;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(stateMutex);
+            readerInitCompleted = true;
+            readerOpened = true;
+            readerStreamInfo = packetReader.GetStreamInfo();
+            if (readerCodecParameters != nullptr) {
+                avcodec_parameters_free(&readerCodecParameters);
+            }
+            readerCodecParameters = copiedCodecParameters;
+            readerPacketTimeBase = packetReader.GetAudioStreamTimeBase();
+            packetCount = packetReader.GetPacketCount();
+        }
+        readerInitCondition.notify_all();
+
+        AVPacket packet{};
+
+        while (!stopRequested) {
+            std::string readError;
+            const AudioPacketReadResult readResult = packetReader.ReadNextAudioPacket(&packet, &readError);
+            {
+                std::lock_guard<std::mutex> lock(stateMutex);
+                packetCount = packetReader.GetPacketCount();
+            }
+
+            if (readResult == AudioPacketReadResult::Eof) {
+                av_packet_unref(&packet);
+                packetQueue.Finish();
+                return;
+            }
+
+            if (readResult == AudioPacketReadResult::Error) {
+                av_packet_unref(&packet);
+                packetQueue.Fail(readError);
+                return;
+            }
+
+            if (!packetQueue.Push(&packet)) {
+                av_packet_unref(&packet);
+                return;
+            }
+        }
+
+        av_packet_unref(&packet);
+    }
+
+    void DecodeThreadMain() {
+        AudioPacketStreamInfo packetStreamInfo;
+        const AVCodecParameters *codecParameters = nullptr;
+        AVRational packetTimeBase{0, 1};
+        {
+            std::unique_lock<std::mutex> lock(stateMutex);
+            readerInitCondition.wait(lock, [this]() { return stopRequested || readerInitCompleted; });
+            if (stopRequested) {
+                return;
+            }
+            if (!readerOpened) {
+                decoderInitCompleted = true;
+                decoderOpened = false;
+                decodeFailed = true;
+                decodeFinished = true;
+                decodeErrorMessage = readerErrorMessage;
+                lock.unlock();
+                decoderInitCondition.notify_all();
+                pcmQueueDataCondition.notify_all();
+                return;
+            }
+            packetStreamInfo = readerStreamInfo;
+            codecParameters = readerCodecParameters;
+            packetTimeBase = readerPacketTimeBase;
+        }
+
+        FfmpegAudioDecoder decoder;
+        const std::string decoderOpenError = decoder.Open(
+            packetStreamInfo,
+            codecParameters,
+            packetTimeBase
+        );
+        if (!decoderOpenError.empty()) {
+            {
+                std::lock_guard<std::mutex> lock(stateMutex);
+                decoderInitCompleted = true;
+                decoderOpened = false;
+                decodeFailed = true;
+                decodeFinished = true;
+                decodeErrorMessage = decoderOpenError;
+            }
+            decoderInitCondition.notify_all();
+            pcmQueueDataCondition.notify_all();
+            return;
+        }
+
+        const AudioDecoderStreamInfo &streamInfo = decoder.GetStreamInfo();
+        {
+            std::lock_guard<std::mutex> lock(stateMutex);
+            containerName = streamInfo.containerName;
+            codecName = streamInfo.codecName;
+            sourceSampleRate = streamInfo.sourceSampleRate;
+            sourceChannels = streamInfo.sourceChannels;
+            sourceSampleFormat = streamInfo.sourceSampleFormat;
+            outputSampleRate = streamInfo.outputSampleRate;
+            outputChannels = streamInfo.outputChannels;
+            durationSec = streamInfo.durationSec;
+            decodedFrames = decoder.GetDecodedFrameCount();
+            decoderInitCompleted = true;
+            decoderOpened = true;
+        }
+        decoderInitCondition.notify_all();  //只有解码线程初始化完成后才会通知播放线程可以开始 创建AudioTrack,需要拿到有效的参数，只有到这里才能达到有效的参数
+
+        while (!stopRequested) {
+            AudioDecoderPcmBlock pcmBlock;
+            std::string decodeError;
+            const AudioDecoderReadResult readResult =
+                decoder.ReadNextPcmBlock(&packetQueue, &pcmBlock, &decodeError);
+
+            {
+                std::lock_guard<std::mutex> lock(stateMutex);
+                decodedFrames = decoder.GetDecodedFrameCount();
+            }
+
+            if (readResult == AudioDecoderReadResult::Eof) {
+                {
+                    std::lock_guard<std::mutex> lock(stateMutex);
+                    decodeFinished = true;
+                }
+                pcmQueueDataCondition.notify_all();
+                break;
+            }
+
+            if (readResult == AudioDecoderReadResult::Error) {
+                {
+                    std::lock_guard<std::mutex> lock(stateMutex);
+                    decodeFailed = true;
+                    decodeFinished = true;
+                    decodeErrorMessage = decodeError;
+                }
+                pcmQueueDataCondition.notify_all();
+                break;
+            }
+
+            std::unique_lock<std::mutex> queueLock(queueMutex);
+            pcmQueueSpaceCondition.wait(
+                queueLock,
+                [this]() { return stopRequested || pcmQueue.size() < kMaxQueuedPcmBlocks; }
+            );
+            if (stopRequested) {
+                break;
+            }
+            const size_t blockSize = pcmBlock.pcmData.size();
+            pcmQueue.push_back(std::move(pcmBlock));
+            const size_t currentQueuedBlocks = pcmQueue.size();
+            queueLock.unlock();
+
+            {
+                std::lock_guard<std::mutex> lock(stateMutex);
+                queuedBlocks = static_cast<int64_t>(currentQueuedBlocks);
+                queuedBytes += static_cast<int64_t>(blockSize);
+            }
+            NATIVE_LOGD_TAG(
+                kTag,
+                "pcm enqueue queuedBlocks=%lld queuedBytes=%lld lastBlockBytes=%zu",
+                static_cast<long long>(queuedBlocks),
+                static_cast<long long>(queuedBytes),
+                blockSize
+            );
+            pcmQueueDataCondition.notify_one();
+        }
     }
 
     void PlaybackThreadMain() {
@@ -335,11 +629,87 @@ struct NativeAudioTrackPlayer::Impl {
         return true;
     }
 
+    PcmQueueReadResult WaitForDecoderInit() {
+        std::unique_lock<std::mutex> lock(stateMutex);
+        decoderInitCondition.wait(lock, [this]() { return stopRequested || decoderInitCompleted; });
+        if (stopRequested) {
+            return PcmQueueReadResult::Stopped;
+        }
+        if (!decoderOpened) {
+            if (!decodeErrorMessage.empty()) {
+                state = PlayerState::Error;
+                message = decodeErrorMessage;
+                lastError = decodeErrorMessage;
+            }
+            return PcmQueueReadResult::Error;
+        }
+        return PcmQueueReadResult::Block;
+    }
+
+    PcmQueueReadResult ReadNextQueuedPcmBlock(AudioDecoderPcmBlock *pcmBlock, std::string *errorMessage) {
+        std::unique_lock<std::mutex> queueLock(queueMutex);
+        pcmQueueDataCondition.wait(
+            queueLock,
+            [this]() {
+                return stopRequested || !pcmQueue.empty() || decodeFinished || decodeFailed;
+            }
+        );
+
+        if (stopRequested) {
+            return PcmQueueReadResult::Stopped;
+        }
+
+        if (!pcmQueue.empty()) {
+            *pcmBlock = std::move(pcmQueue.front());
+            pcmQueue.pop_front();
+            const size_t consumedBytes = pcmBlock->pcmData.size();
+            const size_t remainingBlocks = pcmQueue.size();
+            queueLock.unlock();
+
+            {
+                std::lock_guard<std::mutex> lock(stateMutex);
+                queuedBlocks = static_cast<int64_t>(remainingBlocks);
+                queuedBytes = std::max<int64_t>(0, queuedBytes - static_cast<int64_t>(consumedBytes));
+            }
+            NATIVE_LOGD_TAG(
+                kTag,
+                "pcm dequeue queuedBlocks=%lld queuedBytes=%lld blockBytes=%zu frameIndex=%lld pts=%lld",
+                static_cast<long long>(queuedBlocks),
+                static_cast<long long>(queuedBytes),
+                consumedBytes,
+                static_cast<long long>(pcmBlock->frameIndex),
+                static_cast<long long>(pcmBlock->framePts)
+            );
+            pcmQueueSpaceCondition.notify_one();
+            return PcmQueueReadResult::Block;
+        }
+
+        queueLock.unlock();
+        bool localDecodeFailed = false;
+        bool localDecodeFinished = false;
+        std::string localDecodeErrorMessage;
+        {
+            std::lock_guard<std::mutex> lock(stateMutex);
+            localDecodeFailed = decodeFailed;
+            localDecodeFinished = decodeFinished;
+            localDecodeErrorMessage = decodeErrorMessage;
+        }
+        if (localDecodeFailed) {
+            if (errorMessage != nullptr) {
+                *errorMessage = localDecodeErrorMessage;
+            }
+            return PcmQueueReadResult::Error;
+        }
+        if (localDecodeFinished) {
+            return PcmQueueReadResult::Eof;
+        }
+        return PcmQueueReadResult::Stopped;
+    }
+
     void RunPlayback(JNIEnv *env) {
         jobject audioTrackLocal = nullptr;
         int outputChannelConfig = kChannelOutStereo;
         int outputBufferSize = 0;
-        FfmpegAudioDecoder decoder(inputPath);
 
         auto cleanup = [&]() {
             if (env != nullptr && audioTrackLocal != nullptr) {
@@ -400,34 +770,40 @@ struct NativeAudioTrackPlayer::Impl {
             return true;
         };
 
-        const std::string decoderOpenError = decoder.Open();
-        if (!decoderOpenError.empty()) {
-            SetError(decoderOpenError);
+        const PcmQueueReadResult initResult = WaitForDecoderInit();
+        if (initResult == PcmQueueReadResult::Stopped) {
+            cleanup();
+            return;
+        }
+        if (initResult == PcmQueueReadResult::Error) {
             cleanup();
             return;
         }
 
-        const AudioDecoderStreamInfo &streamInfo = decoder.GetStreamInfo();
+        std::string localInputPath;
+        std::string localContainerName;
+        std::string localCodecName;
+        int localSourceSampleRate = 0;
+        int localSourceChannels = 0;
+        int localOutputSampleRate = 0;
+        int localOutputChannels = 0;
         {
             std::lock_guard<std::mutex> lock(stateMutex);
-            containerName = streamInfo.containerName;
-            codecName = streamInfo.codecName;
-            sourceSampleRate = streamInfo.sourceSampleRate;
-            sourceChannels = streamInfo.sourceChannels;
-            sourceSampleFormat = streamInfo.sourceSampleFormat;
-            outputSampleRate = streamInfo.outputSampleRate;
-            outputChannels = streamInfo.outputChannels;
-            durationSec = streamInfo.durationSec;
-            packetCount = decoder.GetPacketCount();
-            decodedFrames = decoder.GetDecodedFrameCount();
+            localInputPath = inputPath;
+            localContainerName = containerName;
+            localCodecName = codecName;
+            localSourceSampleRate = sourceSampleRate;
+            localSourceChannels = sourceChannels;
+            localOutputSampleRate = outputSampleRate;
+            localOutputChannels = outputChannels;
         }
 
-        outputChannelConfig = outputChannels == 1 ? kChannelOutMono : kChannelOutStereo;
+        outputChannelConfig = localOutputChannels == 1 ? kChannelOutMono : kChannelOutStereo;
 
         jint minBufferSize = env->CallStaticIntMethod(
             audioTrackJni.audioTrackClass,
             audioTrackJni.getMinBufferSize,
-            outputSampleRate,
+            localOutputSampleRate,
             outputChannelConfig,
             kEncodingPcm16Bit
         );
@@ -443,12 +819,12 @@ struct NativeAudioTrackPlayer::Impl {
             return;
         }
 
-        outputBufferSize = std::max(minBufferSize * 4, outputSampleRate * outputChannels * 2 / 5);
+        outputBufferSize = std::max(minBufferSize * 4, localOutputSampleRate * localOutputChannels * 2 / 5);
         audioTrackLocal = env->NewObject(
             audioTrackJni.audioTrackClass,
             audioTrackJni.constructor,
             kStreamMusic,
-            outputSampleRate,
+            localOutputSampleRate,
             outputChannelConfig,
             kEncodingPcm16Bit,
             outputBufferSize,
@@ -478,13 +854,13 @@ struct NativeAudioTrackPlayer::Impl {
         NATIVE_LOGI_TAG(
             kTag,
             "playback started path=%s container=%s codec=%s srcRate=%d srcChannels=%d outRate=%d outChannels=%d bufferSize=%d",
-            decoder.GetInputPath().c_str(),
-            containerName.c_str(),
-            codecName.c_str(),
-            sourceSampleRate,
-            sourceChannels,
-            outputSampleRate,
-            outputChannels,
+            localInputPath.c_str(),
+            localContainerName.c_str(),
+            localCodecName.c_str(),
+            localSourceSampleRate,
+            localSourceChannels,
+            localOutputSampleRate,
+            localOutputChannels,
             outputBufferSize
         );
 
@@ -499,21 +875,19 @@ struct NativeAudioTrackPlayer::Impl {
 
             AudioDecoderPcmBlock pcmBlock;
             std::string decodeError;
-            const AudioDecoderReadResult readResult = decoder.ReadNextPcmBlock(&pcmBlock, &decodeError);
-            if (readResult == AudioDecoderReadResult::Eof) {
+            const PcmQueueReadResult readResult = ReadNextQueuedPcmBlock(&pcmBlock, &decodeError);
+            if (readResult == PcmQueueReadResult::Stopped) {
                 break;
             }
-            if (readResult == AudioDecoderReadResult::Error) {
+            if (readResult == PcmQueueReadResult::Eof) {
+                break;
+            }
+            if (readResult == PcmQueueReadResult::Error) {
                 SetError(decodeError);
                 cleanup();
                 return;
             }
 
-            {
-                std::lock_guard<std::mutex> lock(stateMutex);
-                packetCount = decoder.GetPacketCount();
-                decodedFrames = decoder.GetDecodedFrameCount();
-            }
             if (!writePcmToAudioTrack(pcmBlock.pcmData.data(), static_cast<int>(pcmBlock.pcmData.size()))) {
                 cleanup();
                 return;
@@ -522,9 +896,9 @@ struct NativeAudioTrackPlayer::Impl {
 
         {
             std::lock_guard<std::mutex> lock(stateMutex);
-            packetCount = decoder.GetPacketCount();
-            decodedFrames = decoder.GetDecodedFrameCount();
             finishedNaturally = !stopRequested;
+            queuedBlocks = 0;
+            queuedBytes = 0;
             if (stopRequested) {
                 state = PlayerState::Stopped;
                 message = "Playback stopped from Java.";
@@ -551,15 +925,33 @@ struct NativeAudioTrackPlayer::Impl {
     AudioTrackJni audioTrackJni{};
     PlayerCallbackJni callbackJni{};
     std::thread worker;
+    std::thread readWorker;
+    std::thread decodeWorker;
     mutable std::mutex stateMutex;
+    mutable std::mutex queueMutex;
     std::condition_variable pauseCondition;
+    std::condition_variable readerInitCondition;
+    std::condition_variable decoderInitCondition;
+    std::condition_variable pcmQueueDataCondition;
+    std::condition_variable pcmQueueSpaceCondition;
     std::atomic<bool> stopRequested{false};
     bool pauseRequested = false;
     bool audioTrackPaused = false;
     bool finishedNaturally = false;
+    std::atomic<bool> readerInitCompleted{false};
+    std::atomic<bool> readerOpened{false};
+    std::atomic<bool> decoderInitCompleted{false};
+    std::atomic<bool> decoderOpened{false};
+    std::atomic<bool> decodeFinished{false};
+    std::atomic<bool> decodeFailed{false};
     PlayerState state = PlayerState::Idle;
     std::string message = "Idle.";
     std::string lastError;
+    std::string readerErrorMessage;
+    std::string decodeErrorMessage;
+    AudioPacketStreamInfo readerStreamInfo{};
+    AVCodecParameters *readerCodecParameters = nullptr;
+    AVRational readerPacketTimeBase{0, 1};
     std::string containerName = "-";
     std::string codecName = "-";
     std::string sourceSampleFormat = "-";
@@ -572,6 +964,13 @@ struct NativeAudioTrackPlayer::Impl {
     int64_t decodedFrames = 0;
     int64_t writtenBlocks = 0;
     int64_t writtenBytes = 0;
+    int64_t queuedBlocks = 0;
+    int64_t queuedBytes = 0;
+    std::deque<AudioDecoderPcmBlock> pcmQueue;
+    PacketQueue packetQueue;
+
+    static constexpr size_t kMaxQueuedPcmBlocks = 12;
+    static constexpr size_t kMaxQueuedAudioPackets = 32;
 };
 
 NativeAudioTrackPlayer::NativeAudioTrackPlayer(

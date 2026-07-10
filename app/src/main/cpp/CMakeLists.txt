@@ -74,6 +74,8 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         native-lib.cpp
         NativeLog.cpp
         NativeJniBindings.cpp
+        PacketReader.cpp
+        PacketQueue.cpp
         FfmpegAudioDecoder.cpp
         AVRationalDemo.cpp
         AVBufferDemo.cpp
