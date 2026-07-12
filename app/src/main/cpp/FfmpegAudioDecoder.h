@@ -46,12 +46,12 @@ public:
         AVRational packetTimeBase
     );
     AudioDecoderReadResult ReadNextPcmBlock(
-        PacketQueue *packetQueue,
-        AudioDecoderPcmBlock *block,
-        std::string *errorMessage
+        PacketQueue *packetQueue,  //packet 队列
+        AudioDecoderPcmBlock *block,  //即将要拿到的数据
+        std::string *errorMessage   //错误信息
     );
 
-    const AudioDecoderStreamInfo &GetStreamInfo() const;
+    const AudioDecoderStreamInfo &GetStreamInfo() const;  //为什么这里要用引用，因为
     int64_t GetDecodedFrameCount() const;
 
 private:

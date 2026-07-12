@@ -408,6 +408,7 @@ struct NativeAudioTrackPlayer::Impl {
 
         while (!stopRequested) {
             std::string readError;
+            //读取数据
             const AudioPacketReadResult readResult = packetReader.ReadNextAudioPacket(&packet, &readError);
             {
                 std::lock_guard<std::mutex> lock(stateMutex);
@@ -538,7 +539,7 @@ struct NativeAudioTrackPlayer::Impl {
                 break;
             }
             const size_t blockSize = pcmBlock.pcmData.size();
-            pcmQueue.push_back(std::move(pcmBlock));
+            pcmQueue.push_back(std::move(pcmBlock));   //问题 todo 右值引用  std::move
             const size_t currentQueuedBlocks = pcmQueue.size();
             queueLock.unlock();
 
@@ -966,8 +967,8 @@ struct NativeAudioTrackPlayer::Impl {
     int64_t writtenBytes = 0;
     int64_t queuedBlocks = 0;
     int64_t queuedBytes = 0;
-    std::deque<AudioDecoderPcmBlock> pcmQueue;
-    PacketQueue packetQueue;
+    std::deque<AudioDecoderPcmBlock> pcmQueue;  //pcm 队列
+    PacketQueue packetQueue;  //Packet 队列
 
     static constexpr size_t kMaxQueuedPcmBlocks = 12;
     static constexpr size_t kMaxQueuedAudioPackets = 32;

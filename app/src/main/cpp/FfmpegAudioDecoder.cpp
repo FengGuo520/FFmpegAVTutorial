@@ -127,20 +127,21 @@ struct FfmpegAudioDecoder::Impl {
         }
 
         while (true) {
+            //先从解码器中读取数据 pcm数据
             const int receiveResult = avcodec_receive_frame(codecContext, frame);
             if (receiveResult == 0) {
-                return ConvertFrameToBlock(block, errorMessage);
+                return ConvertFrameToBlock(block, errorMessage);  //pcm --> 重采样
             }
             if (receiveResult == AVERROR_EOF) {
                 return AudioDecoderReadResult::Eof;
             }
-            if (receiveResult != AVERROR(EAGAIN)) {
+            if (receiveResult != AVERROR(EAGAIN)) {  //读取到的数据  返回值不是 EAGAIN
                 if (errorMessage != nullptr) {
                     *errorMessage = std::string("Failed to receive decoded audio frame: ") + AvErrorToString(receiveResult);
                 }
                 return AudioDecoderReadResult::Error;
             }
-
+            //走到这里说明已经是 返回值 eagain
             std::string packetError;
             const PacketQueueReadResult packetReadResult =
                 packetQueue->Read(packet, &packetError);
