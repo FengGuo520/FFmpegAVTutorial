@@ -21,6 +21,7 @@ sealed interface FeatureDestination {
     data object BufferGuide : FeatureDestination
     data object AvBufferGuide : FeatureDestination
     data object AvPacketGuide : FeatureDestination
+    data object DecodePacketGuide : FeatureDestination
     data object AvFrameGuide : FeatureDestination
     data object MovieProber : FeatureDestination
     data object MovieExtract : FeatureDestination
@@ -94,7 +95,7 @@ object FeatureCatalog {
                     id = "decode_packet",
                     titleRes = R.string.feature_decode_packet_title,
                     summaryRes = R.string.feature_decode_packet_summary,
-                    destination = FeatureDestination.Detail("decode_packet")
+                    destination = FeatureDestination.DecodePacketGuide
                 ),
                 FeatureItem(
                     id = "custom_decoder",

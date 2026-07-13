@@ -54,6 +54,11 @@ class BufferGuideActivity : AppCompatActivity() {
                 targetClass = AvPacketGuideActivity::class.java
             ),
             GuideItem(
+                titleRes = R.string.feature_decode_packet_title,
+                summaryRes = R.string.feature_decode_packet_summary,
+                targetClass = DecodePacketGuideActivity::class.java
+            ),
+            GuideItem(
                 titleRes = R.string.feature_av_frame_title,
                 summaryRes = R.string.feature_av_frame_summary,
                 targetClass = AvFrameGuideActivity::class.java

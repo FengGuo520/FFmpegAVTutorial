@@ -55,6 +55,8 @@ public class NativeInstance {
 
     public native void runFrameQueueDemo(long nativePtr);
 
+    public native String decodePacketGuide(long nativePtr, String mediaPath, String outputDir);
+
     public native String muxToFlv(long nativePtr, String videoPath, String audioPath, String outputPath);
 
     public native String openLiveFlvMuxer(
@@ -148,6 +150,10 @@ public class NativeInstance {
 
     public void runFrameQueueDemo() {
         runFrameQueueDemo(nativePtr);
+    }
+
+    public String decodePacketGuide(String mediaPath, String outputDir) {
+        return decodePacketGuide(nativePtr, mediaPath, outputDir);
     }
 
     public String muxToFlv(String videoPath, String audioPath, String outputPath) {

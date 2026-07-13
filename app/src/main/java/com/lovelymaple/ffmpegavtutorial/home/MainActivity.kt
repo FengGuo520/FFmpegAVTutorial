@@ -9,6 +9,7 @@ import com.lovelymaple.ffmpegavtutorial.basic.AvFrameGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.AvPacketGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.AvRationalGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.BufferGuideActivity
+import com.lovelymaple.ffmpegavtutorial.basic.DecodePacketGuideActivity
 import com.lovelymaple.ffmpegavtutorial.basic.FFmpegInfoActivity
 import com.lovelymaple.ffmpegavtutorial.basic.MovieExtractActivity
 import com.lovelymaple.ffmpegavtutorial.basic.MovieProberActivity
@@ -67,6 +68,9 @@ class MainActivity : AppCompatActivity() {
                         }
                         FeatureDestination.AvPacketGuide -> {
                             startActivity(Intent(this, AvPacketGuideActivity::class.java))
+                        }
+                        FeatureDestination.DecodePacketGuide -> {
+                            startActivity(Intent(this, DecodePacketGuideActivity::class.java))
                         }
                         FeatureDestination.AvFrameGuide -> {
                             startActivity(Intent(this, AvFrameGuideActivity::class.java))

@@ -82,6 +82,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         AVPacketDemo.cpp
         AVFrameDemo.cpp
         FrameQueueDemo.cpp
+        DecodePacketGuideDemo.cpp
         MediaProbeDemo.cpp
         MovieExtractDemo.cpp
         StreamingTopicDemo.cpp

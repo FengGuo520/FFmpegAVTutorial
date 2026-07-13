@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="decode_packet_page_title">Decode Packet Guide</string>
+    <string name="decode_packet_badge">libavcodec decode</string>
+    <string name="decode_packet_headline">观察 AVPacket 解码成 AVFrame 的真实流转</string>
+    <string name="decode_packet_description">选择 mp4、flv、aac、mp3 等本地文件，native 层读取压缩 AVPacket，送入解码器，再把音频保存为 s16le PCM，把视频保存为 yuv420p 原始帧。</string>
+    <string name="decode_packet_select_file">选择文件</string>
+    <string name="decode_packet_decode">开始解码</string>
+    <string name="decode_packet_snapshot_title">Selected Input</string>
+    <string name="decode_packet_result_title">Decode Trace</string>
+    <string name="decode_packet_selected_file_value">Selected file: %1$s</string>
+    <string name="decode_packet_source_uri_value">Source URI: %1$s</string>
+    <string name="decode_packet_local_copy_value">Local copy: %1$s</string>
+    <string name="decode_packet_empty_value">Not selected yet</string>
+    <string name="decode_packet_result_empty">Decode trace and raw output paths will appear here.</string>
+    <string name="decode_packet_status_idle">Ready to select a local media file.</string>
+    <string name="decode_packet_status_importing">Importing the selected file into app storage.</string>
+    <string name="decode_packet_status_ready">Ready to decode: %1$s</string>
+    <string name="decode_packet_status_select_file_first">Select a local media file first.</string>
+    <string name="decode_packet_status_decoding">Decoding media file: %1$s</string>
+    <string name="decode_packet_status_done">Decode finished: %1$s</string>
+    <string name="decode_packet_status_error">Decode failed: %1$s</string>
+</resources>
