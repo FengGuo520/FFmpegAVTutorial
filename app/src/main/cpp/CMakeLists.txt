@@ -29,6 +29,12 @@ include_directories(
         ${FFMPEG_INCLUDE_CURRENT}
         ${FFMPEG_ROOT}
         ${OPENSSL_INCLUDE_DIR}
+        ${CMAKE_SOURCE_DIR}/core
+        ${CMAKE_SOURCE_DIR}/playback
+        ${CMAKE_SOURCE_DIR}/guides
+        ${CMAKE_SOURCE_DIR}/media
+        ${CMAKE_SOURCE_DIR}/engine
+        ${CMAKE_SOURCE_DIR}/utils
 )
 
 
@@ -71,24 +77,30 @@ set_target_properties(x264 PROPERTIES IMPORTED_LOCATION ${OPENSSL_LIB_DIR}/x264/
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
-        native-lib.cpp
-        NativeLog.cpp
-        NativeJniBindings.cpp
-        PacketReader.cpp
-        PacketQueue.cpp
-        FfmpegAudioDecoder.cpp
-        AVRationalDemo.cpp
-        AVBufferDemo.cpp
-        AVPacketDemo.cpp
-        AVFrameDemo.cpp
-        FrameQueueDemo.cpp
-        DecodePacketGuideDemo.cpp
-        MediaProbeDemo.cpp
-        MovieExtractDemo.cpp
-        StreamingTopicDemo.cpp
-        NativeAudioTrackPlayer.cpp
-        NativeAudioTrackPlayerDemo.cpp
-        AVEngine.cpp)
+        core/native-lib.cpp
+        core/NativeLog.cpp
+        core/NativeJniBindings.cpp
+
+        utils/DecodedFrameWriters.cpp
+
+        playback/PacketReader.cpp
+        playback/PacketQueue.cpp
+        playback/FfmpegAudioDecoder.cpp
+        playback/NativeAudioTrackPlayer.cpp
+        playback/NativeAudioTrackPlayerDemo.cpp
+
+        guides/AVRationalDemo.cpp
+        guides/AVBufferDemo.cpp
+        guides/AVPacketDemo.cpp
+        guides/AVFrameDemo.cpp
+        guides/FrameQueueDemo.cpp
+        guides/DecodePacketGuideDemo.cpp
+
+        media/MediaProbeDemo.cpp
+        media/MovieExtractDemo.cpp
+        media/StreamingTopicDemo.cpp
+
+        engine/AVEngine.cpp)
 
 # Specifies libraries CMake should link to your target library. You
 # can link libraries from various origins, such as libraries defined in this
