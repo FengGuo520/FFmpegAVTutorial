@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_text_view_lab_title">TextView Lab</string>
+    <string name="feature_text_view_lab_summary">验证 TextView 背景标签、引用框、代码块、描边框和强调背景的显示效果。</string>
+    <string name="text_view_lab_page_title">TextView Lab</string>
+    <string name="text_view_lab_badge">UI Basics</string>
+    <string name="text_view_lab_headline">TextView display styles</string>
+    <string name="text_view_lab_description">This page compares TextView background treatments used in guide pages: inline tags, quote boxes, code blocks, outlined notes, and warning-style emphasis.</string>
+    <string name="text_view_lab_section_background">Background Boxes</string>
+    <string name="text_view_lab_chip_text">So Inline background tag</string>
+    <string name="text_view_lab_quote_text">A soft quote box can make an important idea stand out without feeling like an error state.</string>
+    <string name="text_view_lab_code_text">avcodec_send_packet(ctx, packet)\navcodec_receive_frame(ctx, frame)</string>
+    <string name="text_view_lab_outline_text">Outlined TextView: transparent fill, visible border, useful for comparing boundaries and padding.</string>
+    <string name="text_view_lab_warning_text">Warning-style background: higher contrast for notes that should catch attention.</string>
+</resources>

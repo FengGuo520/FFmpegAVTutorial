@@ -8,6 +8,7 @@
 
     <application
         android:allowBackup="true"
+        android:name=".FfmpegAvTutorialApplication"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -17,6 +18,9 @@
         android:theme="@style/Theme.FFmpegAVTutorial">
         <activity
             android:name=".basic.AvFrameGuideActivity"
+            android:exported="false" />
+        <activity
+            android:name=".basic.TextViewLabActivity"
             android:exported="false" />
         <activity
             android:name=".basic.DecodePacketGuideActivity"
