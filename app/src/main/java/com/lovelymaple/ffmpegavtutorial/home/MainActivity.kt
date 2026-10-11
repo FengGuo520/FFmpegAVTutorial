@@ -15,7 +15,6 @@ import com.lovelymaple.ffmpegavtutorial.basic.MovieExtractActivity
 import com.lovelymaple.ffmpegavtutorial.basic.MovieProberActivity
 import com.lovelymaple.ffmpegavtutorial.basic.NativeAudioTrackPlayerActivity
 import com.lovelymaple.ffmpegavtutorial.basic.StreamingTopicActivity
-import com.lovelymaple.ffmpegavtutorial.basic.TextViewLabActivity
 import com.lovelymaple.ffmpegavtutorial.container.FlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.LiveFlvMuxActivity
 import com.lovelymaple.ffmpegavtutorial.container.RtmpPushActivity
@@ -75,9 +74,6 @@ class MainActivity : AppCompatActivity() {
                         }
                         FeatureDestination.AvFrameGuide -> {
                             startActivity(Intent(this, AvFrameGuideActivity::class.java))
-                        }
-                        FeatureDestination.TextViewLab -> {
-                            startActivity(Intent(this, TextViewLabActivity::class.java))
                         }
                         FeatureDestination.MovieProber -> {
                             startActivity(Intent(this, MovieProberActivity::class.java))

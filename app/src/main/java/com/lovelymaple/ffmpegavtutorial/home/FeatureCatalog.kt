@@ -23,7 +23,6 @@ sealed interface FeatureDestination {
     data object AvPacketGuide : FeatureDestination
     data object DecodePacketGuide : FeatureDestination
     data object AvFrameGuide : FeatureDestination
-    data object TextViewLab : FeatureDestination
     data object MovieProber : FeatureDestination
     data object MovieExtract : FeatureDestination
     data object StreamingTopic : FeatureDestination
@@ -61,12 +60,6 @@ object FeatureCatalog {
                     titleRes = R.string.feature_custom_thread_title,
                     summaryRes = R.string.feature_custom_thread_summary,
                     destination = FeatureDestination.Detail("custom_thread")
-                ),
-                FeatureItem(
-                    id = "text_view_lab",
-                    titleRes = R.string.feature_text_view_lab_title,
-                    summaryRes = R.string.feature_text_view_lab_summary,
-                    destination = FeatureDestination.TextViewLab
                 ),
                 FeatureItem(
                     id = "av_rational_guide",

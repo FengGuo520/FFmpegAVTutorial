@@ -20,9 +20,6 @@
             android:name=".basic.AvFrameGuideActivity"
             android:exported="false" />
         <activity
-            android:name=".basic.TextViewLabActivity"
-            android:exported="false" />
-        <activity
             android:name=".basic.DecodePacketGuideActivity"
             android:exported="false" />
         <activity
