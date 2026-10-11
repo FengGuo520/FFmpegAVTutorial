@@ -281,6 +281,22 @@ Windows PowerShell 下可使用：
 - 正在搭建音视频播放器、转码器、推流器底层能力的学习者。
 - 想把 FFmpeg 学习过程拆成多个小实验逐步完成的人。
 
+## 参考来源与致谢
+
+本工程的 FFmpeg、OpenSSL、x264 等 Android 预编译静态库构建方式主要参考：
+
+- `debugly/MRFFToolChainBuildShell`: https://github.com/debugly/MRFFToolChainBuildShell
+
+当前工程中的 FFmpeg 头文件仍保留了原始构建配置，可在 `app/src/main/cpp/lib/ffmpeg/include/libffmpeg/config.h` 中查看完整 `FFMPEG_CONFIGURATION`。其中的构建路径包含 `MRFFToolChainBuildShell`，对应本工程当前使用的 FFmpeg Android 静态库来源线索。
+
+本工程的学习目录和部分音视频主题拆分方式也参考了：
+
+- `debugly/FFmpegTutorial`: https://github.com/debugly/FFmpegTutorial
+
+该项目面向 iOS/macOS 平台组织 FFmpeg API 与音视频渲染教程，本工程在 Android 平台上按相近的学习路线重新整理实验页面和 JNI/CMake 集成方式。
+
+需要注意的是，当前 FFmpeg 配置启用了 `libx264`、`openssl`，并在配置中包含 `--enable-gpl`、`--enable-nonfree`。如果后续发布 APK、AAR 或开源二进制库，需要重新确认 FFmpeg、x264、OpenSSL 以及本项目自身代码的许可证兼容性。
+
 ## License
 
 请根据你开源仓库实际采用的协议补充 License 文件或在此处声明许可证。
